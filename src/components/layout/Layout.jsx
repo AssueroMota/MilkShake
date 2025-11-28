@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import Sidebar from "../sidebar/SideBar";
 import "./Layout.scss";
-import Header from "../header/Header";
+import Header from "../Header/Header";
 
 const Layout = ({ title, children }) => {
   const [searchQuery, setSearchQuery] = useState("");
-
+// me desculpa ajustei
 // ajustei diversas coisas
 
   return (
