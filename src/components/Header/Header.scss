@@ -1,3 +1,6 @@
+/* ============================================================
+   BASE (DESKTOP)
+   ============================================================ */
 .admin-header {
   width: 100%;
   height: 78px;
@@ -8,114 +11,59 @@
   padding: 0 32px;
   border-bottom: 1px solid #e5e7eb;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  gap: 20px;
 }
 
-/* ----------------- LOGO + TÍTULO ----------------- */
+/* HAMBÚRGUER — desktop escondido */
+.header-hamburger {
+  width: 42px;
+  height: 42px;
+  border: none;
+  background: #6d28d9;
+  border-radius: 10px;
+  display: none;
+  cursor: pointer;
+
+  background-image: url("data:image/svg+xml;utf8,\
+  <svg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26' fill='none'>\
+    <path d='M4 7H22C22.55 7 23 6.55 23 6C23 5.45 22.55 5 22 5H4C3.45 5 3 5.45 3 6C3 6.55 3.45 7 4 7ZM4 14H22C22.55 14 23 13.55 23 13C23 12.45 22.55 12 22 12H4C3.45 12 3 12.45 3 13C3 13.55 3.45 14 4 14ZM4 21H22C22.55 21 23 20.55 23 20C23 19.45 22.55 19 22 19H4C3.45 19 3 19.45 3 20C3 20.55 3.45 21 4 21Z' fill='%23ffffff'/>\
+  </svg>");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 22px;
+}
+
+/* LOGO + título */
 .header-left {
   display: flex;
   align-items: center;
   gap: 14px;
-}
 
-.header-logo {
-  font-size: 24px;
-  font-weight: 700;
-  font-family: "Fredoka One", cursive;
-  color: #4c1d95;
-}
-
-.header-section {
-  font-size: 16px;
-  font-family: "Poppins", sans-serif;
-  color: #e21f81;
-  font-weight: 500;
-}
-
-/* ----------------- BARRA DE BUSCA ----------------- */
-.header-search input {
-  width: 280px;
-  height: 40px;
-  border-radius: 999px;
-  border: 1px solid #e5e7eb;
-  padding: 0 16px;
-  font-size: 14px;
-  outline: none;
-  transition: 0.2s;
-  background: #fafafa;
-}
-
-.header-search input:focus {
-  border-color: #c084fc;
-  box-shadow: 0 0 0 2px rgba(192, 132, 252, 0.25);
-}
-
-/* ----------------- PERFIL ----------------- */
-.header-user {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 8px 16px;
-  background: #ffffff;
-  border-radius: 14px;
-  cursor: pointer;
-  transition: 0.2s ease;
-  border: 1px solid rgba(0, 0, 0, 0.02);
-
-  &:hover {
-    background: #f8f8f8;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  .header-logo {
+    font-size: 24px;
+    font-weight: 700;
+    font-family: "Fredoka One", cursive;
+    color: #4c1d95;
   }
 
-  .user-avatar-wrapper {
-    width: 45px;
-    height: 45px;
-    border-radius: 50%;
-    overflow: hidden;
-    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #d9d9d9;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    img.user-avatar {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-  }
-
-  .user-info {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-
-    .user-name {
-      font-size: 15px;
-      font-weight: 600;
-      color: #1f1f1f;
-    }
-
-    .user-role {
-      font-size: 13px;
-      color: #777;
-      margin-top: -2px;
-    }
-  }
-
-  .user-arrow {
-    font-size: 14px;
-    color: #555;
-    margin-left: 4px;
+  .header-section {
+    font-size: 16px;
+    font-family: "Poppins", sans-serif;
+    color: #e21f81;
+    font-weight: 500;
   }
 }
 
-
-
+/* BUSCA */
 .header-search {
   position: relative;
+  display: flex;
+  align-items: center;
 
   input {
     width: 240px;
-    padding: 10px 40px 10px 14px;
+    height: 40px;
+    padding: 0 40px 0 14px;
     background: #f3f4f6;
     border: 1px solid #e5e7eb;
     border-radius: 12px;
@@ -133,85 +81,108 @@
   .search-icon {
     position: absolute;
     right: 14px;
-    top: 50%;
-    transform: translateY(-50%);
     width: 18px;
     height: 18px;
     opacity: 0.6;
-    background-repeat: no-repeat;
     background-size: contain;
-    background-image: url("data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjN2E3YTdhIiB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMjEuNTg2IDIwLjQxNEwxNy4yID..."); // lupa linda
+    background-repeat: no-repeat;
+    background-image: url("data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjN2E3YTdhIiB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1s..."); 
   }
 }
 
-/* ========== BOTÃO HAMBÚRGUER NO HEADER ========== */
-.header-hamburger {
-  width: 42px;
-  height: 42px;
-  border: none;
-  background: #6d28d9;
-  border-radius: 10px;
-  display: none;
+/* PERFIL */
+.header-user {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 16px;
+  background: #ffffff;
+  border-radius: 14px;
   cursor: pointer;
+  border: 1px solid rgba(0,0,0,0.02);
+  transition: 0.2s ease;
 
-  background-image: url("data:image/svg+xml;utf8,\
-  <svg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26' fill='none'>\
-    <path d='M4 7H22C22.55 7 23 6.55 23 6C23 5.45 22.55 5 22 5H4C3.45 5 3 5.45 3 6C3 6.55 3.45 7 4 7ZM4 14H22C22.55 14 23 13.55 23 13C23 12.45 22.55 12 22 12H4C3.45 12 3 12.45 3 13C3 13.55 3.45 14 4 14ZM4 21H22C22.55 21 23 20.55 23 20C23 19.45 22.55 19 22 19H4C3.45 19 3 19.45 3 20C3 20.55 3.45 21 4 21Z' fill='%23ffffff'/>\
-  </svg>");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 22px;
+  &:hover {
+    background: #f8f8f8;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  }
 
-  @media (max-width: 900px) {
-    display: block;
+  .user-avatar-wrapper {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    overflow: hidden;
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #d9d9d9;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .user-info {
+    display: flex;
+    flex-direction: column;
+    .user-name {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .user-role {
+      font-size: 13px;
+      color: #777;
+      margin-top: -2px;
+    }
   }
 }
 
-/* ============================================= */
-/* ============== RESPONSIVIDADE =============== */
-/* ============================================= */
-
+/* ============================================================
+   📲 TABLET — até 900px
+   ============================================================ */
 @media (max-width: 900px) {
   .admin-header {
+    padding: 0 18px;
     height: 70px;
-    padding: 0 16px;
-    gap: 10px;
+    gap: 14px;
   }
 
-  /* Oculta avatar + nome */
-  .header-user {
-    display: none;
+  /* Mostra hambúrguer */
+  .header-hamburger {
+    display: block;
   }
 
-  /* Reduz tamanho da logo */
-  .header-logo {
-    font-size: 20px;
+  /* Reduz busca */
+  .header-search input {
+    width: 160px;
+    height: 38px;
   }
 
-  /* Oculta subtítulo */
+  /* Oculta seção */
   .header-section {
     display: none;
   }
 
-  /* Barra de busca reduzida */
-  .header-search input {
-    width: 160px;
-    height: 38px;
-    font-size: 13px;
+  /* Reduz logo */
+  .header-logo {
+    font-size: 20px;
   }
 
-  /* Mantém tudo alinhado */
-  .admin-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+  /* Perfil some no tablet */
+  .header-user {
+    display: none;
   }
 }
 
-/* ====== MOBILE MUITO PEQUENO (até 600px) ====== */
+/* ============================================================
+   📱 MOBILE — até 600px
+   ============================================================ */
 @media (max-width: 600px) {
+  .admin-header {
+    padding: 0 14px;
+    height: 64px;
+  }
 
-  /* Oculta completamente a busca */
+  /* Oculta busca */
   .header-search {
     display: none;
   }
@@ -221,3 +192,21 @@
   }
 }
 
+/* ============================================================
+   📱 MOBILE PEQUENO — até 420px
+   ============================================================ */
+@media (max-width: 420px) {
+  .admin-header {
+    padding: 0 10px;
+  }
+
+  .header-logo {
+    font-size: 16px;
+  }
+
+  .header-hamburger {
+    width: 36px;
+    height: 36px;
+    background-size: 20px;
+  }
+}
