@@ -6,8 +6,7 @@ import Header from "../header/Header";
 const Layout = ({ title, children }) => {
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Passamos searchQuery para Header (para digitar)
-  // e para children (para filtrar)
+// ajustei diversas coisas
 
   return (
     <div className="layout-container">
@@ -23,6 +22,6 @@ const Layout = ({ title, children }) => {
       </div>
     </div>
   );
-};
+};  
 
 export default Layout;
