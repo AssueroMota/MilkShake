@@ -1,70 +1,79 @@
-import React, { useState } from "react";
+// src/pages/Pedidos/Pedidos.jsx
+import React, { useEffect, useState } from "react";
 import EditarPedidoModal from "./EditarPedidoModal.jsx";
 import "./Pedidos.scss";
 import StatusBadge from "./StatusBadge.jsx";
 
-export default function Pedidos() {
-  const [pedidos, setPedidos] = useState([
-    {
-      id: 101,
-      itens: [
-        { name: "Hambúrguer Artesanal", qty: 1 },
-        { name: "Batata Frita", qty: 1 },
-      ],
-      total: 39.8,
-      hora: "12:42",
-      status: "solicitado",
-    },
-    {
-      id: 102,
-      itens: [{ name: "Milk-shake Morango", qty: 2 }],
-      total: 35.8,
-      hora: "12:50",
-      status: "andamento",
-    },
-  ]);
+import {
+  listenPedidos,
+  updatePedidoStatus,
+  updatePedidoCompleto,
+  deletePedido
+} from "../../services/pedidos";
 
+export default function Pedidos() {
+  const [pedidos, setPedidos] = useState([]);
   const [editingPedido, setEditingPedido] = useState(null);
   const [filtroStatus, setFiltroStatus] = useState("abertos");
   const [busca, setBusca] = useState("");
 
-  // ===================== Atualizar Status =====================
-  const atualizarStatus = (id, novoStatus) => {
-    setPedidos((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, status: novoStatus } : p))
-    );
+  /* 🔥 Listener realtime */
+  useEffect(() => {
+    const unsub = listenPedidos(setPedidos);
+    return () => unsub();
+  }, []);
+
+  /* ===================== Atualizar Status ===================== */
+  const atualizarStatus = async (id, novoStatus) => {
+    await updatePedidoStatus(id, novoStatus);
   };
 
-  // ===================== Enviar para o Caixa =====================
-  const irParaCaixa = (pedido) => {
-    atualizarStatus(pedido.id, "finalizado");
+  /* ===================== Enviar para Caixa ===================== */
+  const irParaCaixa = async (pedido) => {
+    await updatePedidoStatus(pedido.id, "finalizado");
     window.location.href = `/caixa?pedido=${pedido.id}`;
   };
 
-  const deletarPedido = (id) => {
-    setPedidos((prev) => prev.filter((p) => p.id !== id));
+  /* ===================== Deletar ===================== */
+  const removerPedido = async (id) => {
+    await deletePedido(id);
   };
 
-  const salvarEdicao = (pedidoAtualizado) => {
-    setPedidos((prev) =>
-      prev.map((p) => (p.id === pedidoAtualizado.id ? pedidoAtualizado : p))
-    );
+  /* ===================== Salvar edição ===================== */
+  const salvarEdicao = async (pedidoAtualizado) => {
+    await updatePedidoCompleto(pedidoAtualizado);
     setEditingPedido(null);
   };
 
-  // ===================== FILTROS =====================
-  const pedidosFiltrados = pedidos.filter((p) => {
+  /* ===================== FILTRO + BUSCA ===================== */
+
+  const pedidosFiltrados = pedidos.filter((p, index) => {
+    const numeroSequencial = String(index + 1).padStart(2, "0");
+    const idCurto = p.id.substring(0, 7);
+
+    const textoBusca = `
+      ${p.id}
+      ${idCurto}
+      ${numeroSequencial}
+      ${p.total}
+      ${p.status}
+      ${p.hora}
+      ${p.itens.map((i) => `${i.qty}x ${i.name}`).join(" ")}
+    `
+      .toLowerCase()
+      .trim();
+
+    const buscaOK = textoBusca.includes(busca.toLowerCase());
+
     const statusOK =
       filtroStatus === "abertos"
         ? p.status !== "finalizado"
         : p.status === "finalizado";
 
-    const buscaOK = p.itens.some((i) =>
-      i.name.toLowerCase().includes(busca.toLowerCase())
-    );
-
-    return statusOK && buscaOK;
+    return buscaOK && statusOK;
   });
+
+  /* ===================== RENDER ===================== */
 
   return (
     <div className="pedidos-container">
@@ -101,69 +110,80 @@ export default function Pedidos() {
         <div>Ações</div>
       </div>
 
-      {/* LISTA */}
       {pedidosFiltrados.length === 0 && (
-        <p className="nenhum-pedido">Nenhum pedido encontrado para o filtro atual.</p>
+        <p className="nenhum-pedido">Nenhum pedido encontrado.</p>
       )}
 
-      {pedidosFiltrados.map((p) => (
-        <div className="pedido-row" key={p.id}>
-          <div>
-            <strong>#00{p.id}</strong>
+      {pedidosFiltrados.map((p, index) => {
+        const numeroSequencial = String(index + 1).padStart(2, "0");
+
+        return (
+          <div className="pedido-row" key={p.id}>
+            {/* Número do pedido */}
+            <div>
+              <strong># {numeroSequencial}</strong>
+            </div>
+
+            {/* Itens */}
+            <div className="itens-col">
+              {p.itens.map((i, idx) => (
+                <div key={idx} className="item-line">
+                  {i.qty}x {i.name}
+                </div>
+              ))}
+            </div>
+
+            {/* Total */}
+            <div>
+              <strong>
+                R$ {Number(p.total).toFixed(2).replace(".", ",")}
+              </strong>
+            </div>
+
+            {/* Horário */}
+            <div>{p.hora}</div>
+
+            {/* STATUS */}
+            <div>
+              <StatusBadge
+                status={p.status}
+                onChange={(novo) => atualizarStatus(p.id, novo)}
+              />
+            </div>
+
+            {/* Ações */}
+            <div className="acoes-col">
+              <button
+                className="btn icon editar"
+                onClick={() =>
+                  setEditingPedido({ ...p, numeroSequencial })
+                }
+              />
+
+              {p.status === "solicitado" && (
+                <button
+                  className="btn icon aceitar"
+                  onClick={() => atualizarStatus(p.id, "andamento")}
+                />
+              )}
+
+              {p.status === "andamento" && (
+                <button
+                  className="btn icon caixa"
+                  onClick={() => irParaCaixa(p)}
+                />
+              )}
+
+              <button
+                className="btn icon deletar"
+                onClick={() => removerPedido(p.id)}
+              />
+            </div>
           </div>
+        );
+      })}
 
-          <div className="itens-col">
-            {p.itens.map((i, index) => (
-              <div key={index} className="item-line">
-                {i.qty}x {i.name}
-              </div>
-            ))}
-          </div>
-
-          <div>
-            <strong>R$ {p.total.toFixed(2).replace(".", ",")}</strong>
-          </div>
-
-          <div>{p.hora}</div>
-
-          <div>
-            <StatusBadge
-              status={p.status}
-              onChange={(novo) => atualizarStatus(p.id, novo)}
-            />
-          </div>
-
-<div className="acoes-col">
-
-  {/* EDITAR — sempre aparece */}
-  <button className="btn icon editar" onClick={() => setEditingPedido(p)} />
-
-  {/* SOLICITADO → botão ACEITAR (✔) */}
-  {p.status === "solicitado" && (
-    <button
-      className="btn icon aceitar"
-      onClick={() => atualizarStatus(p.id, "andamento")}
-    />
-  )}
-
-  {/* ANDAMENTO → botão CAIXA */}
-  {p.status === "andamento" && (
-    <button
-      className="btn icon caixa"
-      onClick={() => irParaCaixa(p)}
-    />
-  )}
-
-  {/* FINALIZADO → só deletar */}
-
-  {/* DELETAR — sempre aparece */}
-  <button className="btn icon deletar" onClick={() => deletarPedido(p.id)} />
-</div>
-
-
-        </div>
-      ))}
-
+      {/* MODAL EDITAR */}
       {editingPedido && (
         <EditarPedidoModal
           pedido={editingPedido}

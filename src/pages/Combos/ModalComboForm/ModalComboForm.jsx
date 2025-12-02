@@ -16,30 +16,36 @@ const ModalComboForm = ({
   const [active, setActive] = useState(true);
 
   const [imageFile, setImageFile] = useState(null);
-  const [preview, setPreview] = useState(null);
+  const [preview, setPreview] = useState(null); // vai mostrar imageUrl
 
-  const [discountType, setDiscountType] = useState("none"); // "none" | "percent" | "value"
+  const [discountType, setDiscountType] = useState("none");
   const [discountValue, setDiscountValue] = useState(0);
 
   const [selectedProductIds, setSelectedProductIds] = useState([]);
 
-  // filtros da lista de produtos
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
-  // PRE-LOAD EM MODO EDIT
+  // ==========================================
+  // 🔵 PRE-LOAD EM MODO EDIT
+  // ==========================================
   useEffect(() => {
     if (combo) {
       setName(combo.name || "");
       setCategory(combo.category || categories[0] || "");
       setDescription(combo.description || "");
       setActive(combo.active ?? true);
-      setPreview(combo.image || null);
+
+      // 🔥 AGORA usa a imagem do backend corretamente (imageUrl)
+      setPreview(combo.imageUrl || null);
+
       setDiscountType(combo.discountType || "none");
       setDiscountValue(combo.discountValue || 0);
+
       setSelectedProductIds(combo.items?.map((i) => i.id) || []);
+      setImageFile(null);
     } else {
-      // modo add
+      // modo ADD
       setName("");
       setCategory(categories[0] || "");
       setDescription("");
@@ -54,14 +60,20 @@ const ModalComboForm = ({
 
   if (!open) return null;
 
+  // ==========================================
+  // 🔵 Upload Preview
+  // ==========================================
   const onFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
     setImageFile(file);
     setPreview(URL.createObjectURL(file));
   };
 
-  // Produtos filtrados para a lista de seleção
+  // ==========================================
+  // 🔵 FILTROS DE PRODUTOS
+  // ==========================================
   const filteredProducts = useMemo(() => {
     let list = [...products];
 
@@ -81,22 +93,22 @@ const ModalComboForm = ({
     return list;
   }, [products, search, categoryFilter]);
 
-  // Itens selecionados do combo
   const selectedItems = useMemo(
     () => products.filter((p) => selectedProductIds.includes(p.id)),
     [products, selectedProductIds]
   );
 
-  // Cálculo de preços
+  // ==========================================
+  // 🔵 CÁLCULO DE PREÇOS
+  // ==========================================
   const { originalPrice, finalPrice, discountAmount } = useMemo(() => {
-    const total = selectedItems.reduce((sum, p) => sum + p.price, 0);
+    const total = selectedItems.reduce((sum, p) => sum + Number(p.price || 0), 0);
 
     let discount = 0;
     if (discountType === "percent") {
-      const perc = Number(discountValue) || 0;
-      discount = (total * perc) / 100;
+      discount = (total * Number(discountValue || 0)) / 100;
     } else if (discountType === "value") {
-      discount = Number(discountValue) || 0;
+      discount = Number(discountValue || 0);
     }
 
     let final = total - discount;
@@ -109,60 +121,59 @@ const ModalComboForm = ({
     };
   }, [selectedItems, discountType, discountValue]);
 
+  // ==========================================
+  // 🔵 TOGGLE PRODUTO
+  // ==========================================
   const toggleProduct = (id) => {
     setSelectedProductIds((prev) =>
-      prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id]
+      prev.includes(id)
+        ? prev.filter((pid) => pid !== id)
+        : [...prev, id]
     );
   };
 
+  // ==========================================
+  // 🔵 SUBMIT
+  // ==========================================
   const handleSubmit = (e) => {
     e?.preventDefault();
 
-    if (!name.trim()) {
-      alert("Informe o nome do combo.");
-      return;
-    }
+    if (!name.trim()) return alert("Informe o nome do combo.");
+    if (!category.trim()) return alert("Selecione uma categoria.");
+    if (!description.trim()) return alert("A descrição é obrigatória.");
+    if (selectedItems.length === 0)
+      return alert("Selecione pelo menos 1 produto.");
 
-    if (!category.trim()) {
-      alert("Selecione ou informe uma categoria.");
-      return;
-    }
+    onSave({
+      name: name.trim(),
+      category: category.trim(),
+      description: description.trim(),
+      active,
+      items: selectedItems.map((i) => ({
+        id: i.id,
+        name: i.name,
+        price: Number(i.price || 0),
+        image: i.imageUrl, // 🔥 salva imagem do produto
+        category: i.category,
+      })),
 
-    if (!description.trim()) {
-      alert("A descrição é obrigatória.");
-      return;
-    }
+      discountType,
+      discountValue: discountType === "none" ? 0 : Number(discountValue || 0),
 
-    if (selectedItems.length === 0) {
-      alert("Selecione pelo menos 1 produto para o combo.");
-      return;
-    }
+      // os preços calculados serão aplicados no Combos.jsx
+      totalOriginal: Number(originalPrice || 0),
+      totalFinal: Number(finalPrice || 0),
 
-    const normalizedDiscountValue =
-      discountType === "none" ? 0 : Number(discountValue) || 0;
+      // 🔥 ESSENCIAL — o combo só envia "image: imageFile"
+      image: imageFile || null,
 
-onSave({
-  name: name.trim(),
-  category: category.trim(),
-  description: description.trim(),
-  active,
-  items: selectedItems.map((i) => ({
-    id: i.id,
-    name: i.name,
-    price: Number(i.price || 0),
-    image: i.image,
-    category: i.category,
-  })),
-  discountType,
-  discountValue: normalizedDiscountValue,
-  totalOriginal: Number(originalPrice || 0),
-  totalFinal: Number(finalPrice || 0),
-  image: imageFile,
-  preview,
-});
-
+      preview, // só para UI
+    });
   };
 
+  // ==========================================
+  // 🔵 UI
+  // ==========================================
   return (
     <div className="modal-overlay fade-in" onClick={onClose}>
       <div
@@ -172,9 +183,7 @@ onSave({
         {/* HEADER */}
         <div className="modal-form-header">
           <h2>{mode === "add" ? "Adicionar Combo" : "Editar Combo"}</h2>
-          <button className="close-btn" onClick={onClose}>
-            ×
-          </button>
+          <button className="close-btn" onClick={onClose}>×</button>
         </div>
 
         {/* BODY */}
@@ -247,7 +256,7 @@ onSave({
 
           {/* COLUNA DIREITA */}
           <div className="form-right">
-            {/* CAMPOS PRINCIPAIS */}
+
             <div className="form-group">
               <label>Nome do Combo</label>
               <input
@@ -255,20 +264,14 @@ onSave({
                 placeholder="Ex: Combo Burger Deluxe"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                required
               />
             </div>
 
             <div className="form-group">
               <label>Categoria</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
+              <select value={category} onChange={(e) => setCategory(e.target.value)}>
                 {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
+                  <option key={c}>{c}</option>
                 ))}
               </select>
             </div>
@@ -282,9 +285,6 @@ onSave({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
-              <small className="helper-text">
-                Dica: use uma frase de impacto para o card.
-              </small>
             </div>
 
             {/* DESCONTO */}
@@ -294,9 +294,7 @@ onSave({
               <div className="discount-modes">
                 <button
                   type="button"
-                  className={`mode-btn ${
-                    discountType === "none" ? "active" : ""
-                  }`}
+                  className={`mode-btn ${discountType === "none" ? "active" : ""}`}
                   onClick={() => setDiscountType("none")}
                 >
                   Sem desconto
@@ -304,9 +302,7 @@ onSave({
 
                 <button
                   type="button"
-                  className={`mode-btn ${
-                    discountType === "percent" ? "active" : ""
-                  }`}
+                  className={`mode-btn ${discountType === "percent" ? "active" : ""}`}
                   onClick={() => setDiscountType("percent")}
                 >
                   %
@@ -314,9 +310,7 @@ onSave({
 
                 <button
                   type="button"
-                  className={`mode-btn ${
-                    discountType === "value" ? "active" : ""
-                  }`}
+                  className={`mode-btn ${discountType === "value" ? "active" : ""}`}
                   onClick={() => setDiscountType("value")}
                 >
                   R$
@@ -331,7 +325,6 @@ onSave({
                     max={100}
                     value={discountValue}
                     onChange={(e) => setDiscountValue(e.target.value)}
-                    placeholder="Ex: 10"
                   />
                   <span className="suffix">%</span>
                 </div>
@@ -346,20 +339,16 @@ onSave({
                     step="0.01"
                     value={discountValue}
                     onChange={(e) => setDiscountValue(e.target.value)}
-                    placeholder="Ex: 10,00"
                   />
                 </div>
               )}
             </div>
 
-            {/* SELEÇÃO DE PRODUTOS */}
+            {/* PRODUTOS */}
             <div className="products-section">
               <div className="products-header">
                 <div>
                   <label>Produtos do combo</label>
-                  <p className="products-subtitle">
-                    Selecione os produtos que farão parte deste combo.
-                  </p>
                 </div>
 
                 <span className="badge-count">
@@ -368,12 +357,11 @@ onSave({
                 </span>
               </div>
 
-              {/* FILTROS / BUSCA */}
               <div className="products-filters">
                 <div className="search-box">
                   <input
                     type="text"
-                    placeholder="Buscar produto por nome ou categoria..."
+                    placeholder="Buscar produto..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
@@ -396,14 +384,7 @@ onSave({
                 </div>
               </div>
 
-              {/* LISTA DE PRODUTOS */}
               <div className="products-list">
-                {filteredProducts.length === 0 && (
-                  <p className="empty-text">
-                    Nenhum produto encontrado com os filtros atuais.
-                  </p>
-                )}
-
                 {filteredProducts.map((p) => {
                   const checked = selectedProductIds.includes(p.id);
 
@@ -418,7 +399,10 @@ onSave({
                           checked={checked}
                           onChange={() => toggleProduct(p.id)}
                         />
-                        <img src={p.image} alt={p.name} />
+
+                        {/* 🔥 DEVE usar imageUrl (backend) */}
+                        <img src={p.imageUrl} alt={p.name} />
+
                         <div className="info">
                           <span className="name">{p.name}</span>
                           <span className="category">{p.category}</span>
@@ -427,7 +411,7 @@ onSave({
 
                       <div className="right">
                         <span className="price">
-                          {p.price.toLocaleString("pt-BR", {
+                          {Number(p.price).toLocaleString("pt-BR", {
                             style: "currency",
                             currency: "BRL",
                           })}
@@ -446,6 +430,7 @@ onSave({
           <button className="btn-secondary" onClick={onClose}>
             Cancelar
           </button>
+
           <button className="btn-primary" onClick={handleSubmit}>
             Salvar Combo
           </button>

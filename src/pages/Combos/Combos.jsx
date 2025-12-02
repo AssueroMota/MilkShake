@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import "./Combos.scss";
 
 // MODAIS
@@ -6,204 +6,110 @@ import ModalComboDelete from "./ModalComboDelete/ModalComboDelete.jsx";
 import ModalComboDetails from "./ModalComboDetails/ModalComboDetails.jsx";
 import ModalComboForm from "./ModalComboForm/ModalComboForm.jsx";
 
-// IMAGENS (pode trocar pelas que quiser)
-import burgerImg from "../../assets/img/produtos/burger.png";
-import pizzaImg from "../../assets/img/produtos/pizza.png";
-import milkImg from "../../assets/img/produtos/milk.png";
-import sorveteImg from "../../assets/img/produtos/sorvete.png";
-import acaiImg from "../../assets/img/produtos/acai.png";
-import batataImg from "../../assets/img/produtos/batata.png";
-import bebidaImg from "../../assets/img/produtos/bebidas.png";
+// SERVICES
+import {
+  listenCombos,
+  createCombo,
+  updateCombo,
+  deleteCombo,
+} from "../../services/combos";
 
-// ---------------- MOCK DE PRODUTOS DISPONÍVEIS PARA COMBOS ----------------
-
-const MOCK_PRODUCTS = [
-  {
-    id: 1,
-    image: burgerImg,
-    name: "Bacon Burger Deluxe",
-    category: "Hambúrgueres",
-    price: 24.9,
-    description: "Hambúrguer artesanal com bacon crocante.",
-  },
-  {
-    id: 2,
-    image: pizzaImg,
-    name: "Pizza Margherita",
-    category: "Pizzas",
-    price: 32.9,
-    description: "Pizza italiana com manjericão fresco.",
-  },
-  {
-    id: 3,
-    image: milkImg,
-    name: "Milk-shake Morango",
-    category: "Milk-shakes",
-    price: 18.9,
-    description: "Milk-shake de morango com creme especial.",
-  },
-  {
-    id: 4,
-    image: sorveteImg,
-    name: "Sorvete Baunilha",
-    category: "Sorvetes",
-    price: 12.9,
-    description: "Sorvete artesanal de baunilha.",
-  },
-  {
-    id: 5,
-    image: acaiImg,
-    name: "Açaí na Tigela",
-    category: "Açaí",
-    price: 16.9,
-    description: "Tigela de açaí com frutas frescas.",
-  },
-  {
-    id: 6,
-    image: batataImg,
-    name: "Batata Frita Grande",
-    category: "Porções",
-    price: 14.9,
-    description: "Batatas fritas crocantes.",
-  },
-  {
-    id: 7,
-    image: bebidaImg,
-    name: "Refrigerante Lata",
-    category: "Bebidas",
-    price: 7.5,
-    description: "Lata 350ml gelada.",
-  },
-];
-
-// helper para criar combo já com preço calculado
-const buildCombo = ({
-  id,
-  name,
-  image,
-  category,
-  description,
-  productIds,
-  discountType = "none", // "none" | "percent" | "value"
-  discountValue = 0,
-  active = true,
-  orders = 0,
-}) => {
-  const items = productIds
-    .map((pid) => MOCK_PRODUCTS.find((p) => p.id === pid))
-    .filter(Boolean);
-
-  const originalPrice = items.reduce((sum, p) => sum + p.price, 0);
-
-  let finalPrice = originalPrice;
-  let discountAmount = 0;
-
-  if (discountType === "percent") {
-    discountAmount = (originalPrice * discountValue) / 100;
-  } else if (discountType === "value") {
-    discountAmount = discountValue;
-  }
-
-  finalPrice = originalPrice - discountAmount;
-  if (finalPrice < 0) finalPrice = 0;
-
-  return {
-    id,
-    name,
-    image,
-    category,
-    description,
-    items,
-    originalPrice,
-    finalPrice,
-    discountType,
-    discountValue,
-    active,
-    orders,
-  };
-};
-
-const initialCombos = [
-  buildCombo({
-    id: 1,
-    name: "Combo Burger Deluxe",
-    image: burgerImg,
-    category: "Hambúrgueres",
-    description: "Hambúrguer artesanal + batata frita + refrigerante 500ml",
-    productIds: [1, 6, 7],
-    discountType: "value",
-    discountValue: 5,
-    active: true,
-    orders: 120,
-  }),
-  buildCombo({
-    id: 2,
-    name: "Combo Pizza + Refri",
-    image: pizzaImg,
-    category: "Pizzas",
-    description: "Pizza média (até 2 sabores) + refrigerante 1L",
-    productIds: [2, 7],
-    discountType: "percent",
-    discountValue: 10,
-    active: true,
-    orders: 80,
-  }),
-  buildCombo({
-    id: 3,
-    name: "Combo Doce",
-    image: milkImg,
-    category: "Milk-shakes",
-    description: "Milk-shake grande + sobremesa especial do dia",
-    productIds: [3, 4],
-    discountType: "none",
-    discountValue: 0,
-    active: true,
-    orders: 40,
-  }),
-];
+import { listenProducts } from "../../services/products";
+import { listenCategories } from "../../services/categories";
+import { uploadImage } from "../../services/cloudinary";
 
 const Combos = ({ searchQuery }) => {
-  const [combos, setCombos] = useState(initialCombos);
+  const [combos, setCombos] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+
   const [viewMode, setViewMode] = useState("grid");
 
-  // filtros
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("bestseller");
 
-  // modais
   const [deleteModal, setDeleteModal] = useState(null);
   const [detailsModal, setDetailsModal] = useState(null);
   const [comboFormModal, setComboFormModal] = useState(null);
 
-  // categorias disponíveis (usando categorias existentes dos produtos)
+  // ===========================
+  // 🔥 LISTEN EM TEMPO REAL — COMBOS
+  // ===========================
+  useEffect(() => {
+    const unsub = listenCombos((list) => setCombos(list));
+    return () => unsub && unsub();
+  }, []);
+
+  // 🔥 LISTEN PRODUTOS (para validar combos)
+  useEffect(() => {
+    const unsub = listenProducts((list) => setProducts(list));
+    return () => unsub && unsub();
+  }, []);
+
+  // 🔥 LISTEN CATEGORIAS
+  useEffect(() => {
+    const unsub = listenCategories((list) => setCategories(list));
+    return () => unsub && unsub();
+  }, []);
+
+  // ======================================
+  // 🔵 OPÇÕES DE CATEGORIA PARA FILTRO
+  // ======================================
   const comboCategories = useMemo(() => {
     const set = new Set(combos.map((c) => c.category));
     return ["Todas as Categorias", ...Array.from(set)];
   }, [combos]);
 
-  // LISTA FILTRADA
+  // ======================================
+  // 🔵 LISTA FILTRADA + REGRAS DE ACTIVE/INACTIVE
+  // ======================================
   const filteredCombos = useMemo(() => {
     let list = [...combos];
 
+    // 🔥 1. Se a categoria do combo está INATIVA → combo fica inativo
+    list = list.map((combo) => {
+      const cat = categories.find((c) => c.name === combo.category);
+      if (cat && cat.active === false) {
+        return { ...combo, active: false };
+      }
+      return combo;
+    });
+
+    // 🔥 2. Se QUALQUER item do combo estiver INATIVO → combo fica inativo
+    list = list.map((combo) => {
+      const hasInactiveItem = combo.items.some((item) => {
+        const product = products.find((p) => p.id === item.id);
+        return product && product.active === false;
+      });
+
+      if (hasInactiveItem) {
+        return { ...combo, active: false };
+      }
+
+      return combo;
+    });
+
+    // Filtro por categoria
     if (categoryFilter !== "all") {
       list = list.filter((c) => c.category === categoryFilter);
     }
 
+    // Filtro por status
     if (statusFilter !== "all") {
       list = list.filter((c) =>
         statusFilter === "active" ? c.active : !c.active
       );
     }
 
-    // aqui poderia usar searchQuery vindo do header se um dia quiser
+    // Filtro por busca
     if (searchQuery?.trim()) {
       list = list.filter((c) =>
         c.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
-    // ordenação
+    // Ordenação
     if (sortBy === "bestseller") {
       list.sort((a, b) => b.orders - a.orders);
     }
@@ -221,33 +127,63 @@ const Combos = ({ searchQuery }) => {
     }
 
     return list;
-  }, [combos, categoryFilter, statusFilter, sortBy, searchQuery]);
+  }, [combos, products, categories, categoryFilter, statusFilter, sortBy, searchQuery]);
 
-  // toggle status
-  const toggleStatus = (id) => {
-    setCombos((prev) =>
-      prev.map((c) =>
-        c.id === id ? { ...c, active: !c.active } : c
-      )
-    );
+  // =============================
+  // 🔵 STATUS
+  // =============================
+  const toggleStatus = async (combo) => {
+    await updateCombo(combo.id, { active: !combo.active });
   };
 
-  // delete combo
-  const handleDelete = () => {
-    setCombos((prev) => prev.filter((c) => c.id !== deleteModal.id));
+  // =============================
+  // 🔵 DELETE
+  // =============================
+  const handleDelete = async () => {
+    if (!deleteModal) return;
+
+    // Remove imagem do Cloudinary se tiver
+    if (deleteModal.imagePublicId) {
+      await fetch(`${import.meta.env.VITE_SERVER_URL}/delete-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publicId: deleteModal.imagePublicId }),
+      });
+    }
+
+    await deleteCombo(deleteModal.id);
     setDeleteModal(null);
   };
 
-  // salvar combo (add/edit)
-  const handleSaveCombo = (data) => {
-    // data vem do modal com:
-    // { name, category, description, active, items, discountType, discountValue, preview, image }
+  // =============================
+  // 🔵 ADD / EDIT (com Cloudinary)
+  // =============================
+  const handleSaveCombo = async (data) => {
+    let imageUrl = comboFormModal?.combo?.imageUrl || null;
+    let imagePublicId = comboFormModal?.combo?.imagePublicId || null;
 
+    // Upload de nova imagem
+    if (data.image) {
+      if (imagePublicId) {
+        await fetch(`${import.meta.env.VITE_SERVER_URL}/delete-image`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ publicId: imagePublicId }),
+        });
+      }
+
+      const uploaded = await uploadImage(data.image, "combos");
+      imageUrl = uploaded.url;
+      imagePublicId = uploaded.publicId;
+    }
+
+    // Preço original
     const originalPrice = data.items.reduce(
       (sum, item) => sum + item.price,
       0
     );
 
+    // DESCONTO
     let discountAmount = 0;
     if (data.discountType === "percent") {
       discountAmount = (originalPrice * data.discountValue) / 100;
@@ -258,43 +194,25 @@ const Combos = ({ searchQuery }) => {
     let finalPrice = originalPrice - discountAmount;
     if (finalPrice < 0) finalPrice = 0;
 
-    if (comboFormModal?.mode === "add") {
-      const newCombo = {
-        id: Date.now(),
-        name: data.name,
-        category: data.category,
-        description: data.description,
-        image: data.preview || burgerImg,
-        items: data.items,
-        active: data.active,
-        discountType: data.discountType,
-        discountValue: data.discountValue,
-        originalPrice,
-        finalPrice,
-        orders: 0,
-      };
+    const payload = {
+      name: data.name,
+      category: data.category,
+      description: data.description,
+      active: data.active,
+      discountType: data.discountType,
+      discountValue: data.discountValue,
+      items: data.items,
+      originalPrice,
+      finalPrice,
+      imageUrl,
+      imagePublicId,
+      orders: data.orders || 0,
+    };
 
-      setCombos((prev) => [...prev, newCombo]);
+    if (comboFormModal.mode === "add") {
+      await createCombo(payload);
     } else {
-      setCombos((prev) =>
-        prev.map((c) =>
-          c.id === comboFormModal.combo.id
-            ? {
-                ...c,
-                name: data.name,
-                category: data.category,
-                description: data.description,
-                image: data.preview || c.image,
-                items: data.items,
-                active: data.active,
-                discountType: data.discountType,
-                discountValue: data.discountValue,
-                originalPrice,
-                finalPrice,
-              }
-            : c
-        )
-      );
+      await updateCombo(comboFormModal.combo.id, payload);
     }
 
     setComboFormModal(null);
@@ -308,9 +226,7 @@ const Combos = ({ searchQuery }) => {
 
         <button
           className="btn-add"
-          onClick={() =>
-            setComboFormModal({ mode: "add", combo: null })
-          }
+          onClick={() => setComboFormModal({ mode: "add", combo: null })}
         >
           <span className="add-icon" />
           Adicionar Combo
@@ -325,9 +241,7 @@ const Combos = ({ searchQuery }) => {
             value={categoryFilter}
             onChange={(e) =>
               setCategoryFilter(
-                e.target.value === "Todas as Categorias"
-                  ? "all"
-                  : e.target.value
+                e.target.value === "Todas as Categorias" ? "all" : e.target.value
               )
             }
           >
@@ -351,10 +265,7 @@ const Combos = ({ searchQuery }) => {
 
         <div className="filtro-item">
           <label>Ordenar por</label>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-          >
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
             <option value="bestseller">Mais vendidos</option>
             <option value="name-asc">Nome A-Z</option>
             <option value="name-desc">Nome Z-A</option>
@@ -384,13 +295,14 @@ const Combos = ({ searchQuery }) => {
       {viewMode === "grid" && (
         <div className="combos-grid">
           {filteredCombos.map((combo) => (
-            <div key={combo.id} className="combo-card">
-
-              <div
-                className="combo-img"
-                onClick={() => setDetailsModal(combo)}
-              >
-                <img src={combo.image} alt={combo.name} />
+            <div
+              key={combo.id}
+              className={`combo-card ${!combo.active ? "inativo-card" : ""}`}
+            >
+              <div className="combo-img" onClick={() => setDetailsModal(combo)}>
+                {combo.imageUrl && (
+                  <img src={combo.imageUrl} alt={combo.name} />
+                )}
               </div>
 
               <div className="combo-info">
@@ -445,7 +357,7 @@ const Combos = ({ searchQuery }) => {
                     <input
                       type="checkbox"
                       checked={combo.active}
-                      onChange={() => toggleStatus(combo.id)}
+                      onChange={() => toggleStatus(combo)}
                     />
                     <span className="slider"></span>
                   </label>
@@ -460,13 +372,12 @@ const Combos = ({ searchQuery }) => {
                   </button>
                 </div>
               </div>
-
             </div>
           ))}
         </div>
       )}
 
-      {/* LIST / TABLE */}
+      {/* TABLE */}
       {viewMode === "list" && (
         <table className="combos-table">
           <thead>
@@ -482,44 +393,42 @@ const Combos = ({ searchQuery }) => {
 
           <tbody>
             {filteredCombos.map((combo) => (
-              <tr key={combo.id}>
-                <td
-                  className="td-combo"
-                  onClick={() => setDetailsModal(combo)}
-                >
-                  <img src={combo.image} alt={combo.name} />
+              <tr
+                key={combo.id}
+                className={!combo.active ? "inativo-row" : ""}
+              >
+                <td className="td-combo" onClick={() => setDetailsModal(combo)}>
+                  {combo.imageUrl && (
+                    <img src={combo.imageUrl} alt={combo.name} />
+                  )}
                   <div>
                     <strong>{combo.name}</strong>
-                    <span className="table-desc">
-                      {combo.description}
-                    </span>
+                    <span className="table-desc">{combo.description}</span>
                   </div>
                 </td>
 
                 <td>{combo.category}</td>
-
                 <td>{combo.items.length} itens</td>
 
-<td className="td-preco">
-  <div className="price-wrapper">
-    {combo.originalPrice !== combo.finalPrice && (
-      <span className="old-price">
-        {combo.originalPrice.toLocaleString("pt-BR", {
-          style: "currency",
-          currency: "BRL",
-        })}
-      </span>
-    )}
+                <td className="td-preco">
+                  <div className="price-wrapper">
+                    {combo.originalPrice !== combo.finalPrice && (
+                      <span className="old-price">
+                        {combo.originalPrice.toLocaleString("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        })}
+                      </span>
+                    )}
 
-    <span className="final-price">
-      {combo.finalPrice.toLocaleString("pt-BR", {
-        style: "currency",
-        currency: "BRL",
-      })}
-    </span>
-  </div>
-</td>
-
+                    <span className="final-price">
+                      {combo.finalPrice.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                    </span>
+                  </div>
+                </td>
 
                 <td>
                   <span
@@ -544,7 +453,7 @@ const Combos = ({ searchQuery }) => {
                     <input
                       type="checkbox"
                       checked={combo.active}
-                      onChange={() => toggleStatus(combo.id)}
+                      onChange={() => toggleStatus(combo)}
                     />
                     <span className="slider"></span>
                   </label>
@@ -587,10 +496,8 @@ const Combos = ({ searchQuery }) => {
           mode={comboFormModal.mode}
           onClose={() => setComboFormModal(null)}
           onSave={handleSaveCombo}
-          products={MOCK_PRODUCTS}
-          categories={comboCategories.filter(
-            (c) => c !== "Todas as Categorias"
-          )}
+          products={products}
+          categories={categories.map((c) => c.name)}
         />
       )}
     </div>

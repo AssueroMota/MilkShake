@@ -13,6 +13,8 @@
     "@svgr/webpack": "^8.1.0",
     "animate.css": "^4.1.1",
     "aos": "^2.3.4",
+    "axios": "^1.13.2",
+    "firebase": "^12.6.0",
     "fslightbox-react": "^1.7.6",
     "i18next": "^23.4.5",
     "lightbox.js-react": "^0.8.2",

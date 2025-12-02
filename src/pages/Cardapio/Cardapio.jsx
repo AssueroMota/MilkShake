@@ -1,284 +1,308 @@
-// src/pages/Cardapio/Cardapio.jsx
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import "./Cardapio.scss";
-import DetailsModal from "./DetailsModal.jsx";
 
-// IMAGENS DAS CATEGORIAS / PRODUTOS
-import burgerImg from "../../assets/img/produtos/burger.png";
-import pizzaImg from "../../assets/img/produtos/pizza.png";
-import milkImg from "../../assets/img/produtos/milk.png";
-import sorveteImg from "../../assets/img/produtos/sorvete.png";
-import acaiImg from "../../assets/img/produtos/acai.png";
-import batataImg from "../../assets/img/produtos/batata.png";
-import bebidaImg from "../../assets/img/produtos/bebidas.png";
+import DetailsModal from "./DetailsModal.jsx";
 import CartButton from "./CartButton.jsx";
 import CartSidebar from "./CartSidebar.jsx";
 
-/* ------------------------------------------------------------------- */
-/* CATEGORIAS */
-const CATEGORIES = [
-  { id: 1, name: "Hambúrgueres", image: burgerImg },
-  { id: 2, name: "Pizzas", image: pizzaImg },
-  { id: 3, name: "Milk-Shakes", image: milkImg },
-  { id: 4, name: "Sorvetes", image: sorveteImg },
-  { id: 5, name: "Açaí", image: acaiImg },
-  { id: 6, name: "Porções", image: batataImg },
-  { id: 7, name: "Bebidas", image: bebidaImg },
-  { id: 8, name: "Combos", image: burgerImg },
-];
+// Serviços do backend
+import { listenProducts } from "../../services/products";
+import { listenCombos } from "../../services/combos";
+import { listenCategories } from "../../services/categories";
 
-/* ------------------------------------------------------------------- */
-/* PRODUTOS MOCK */
-const PRODUCTS = [
-  {
-    id: 1,
-    categoryId: 1,
-    name: "Hambúrguer Artesanal",
-    description: "Pão brioche, carne 160g, queijo e salada.",
-    price: 24.9,
-    image: burgerImg,
-  },
-  {
-    id: 2,
-    categoryId: 1,
-    name: "Burger Pepperoni",
-    description: "Carne 160g, pepperoni e cheddar cremoso.",
-    price: 34.9,
-    image: burgerImg,
-  },
-  {
-    id: 3,
-    categoryId: 2,
-    name: "Pizza Pepperoni",
-    description: "Massa fina, molho artesanal e pepperoni.",
-    price: 39.9,
-    image: pizzaImg,
-  },
-  {
-    id: 4,
-    categoryId: 2,
-    name: "Pizza Margherita",
-    description: "Tomate, manjericão e muçarela.",
-    price: 32.9,
-    image: pizzaImg,
-  },
-  {
-    id: 5,
-    categoryId: 3,
-    name: "Milkshake Morango",
-    description: "Sorvete artesanal com morango fresco.",
-    price: 17.9,
-    image: milkImg,
-  },
-  {
-    id: 6,
-    categoryId: 3,
-    name: "Milkshake Chocolate",
-    description: "Feito com chocolate belga.",
-    price: 18.9,
-    image: milkImg,
-  },
-  {
-    id: 7,
-    categoryId: 4,
-    name: "Sorvete Baunilha",
-    description: "Sorvete cremoso artesanal.",
-    price: 12.9,
-    image: sorveteImg,
-  },
-  {
-    id: 8,
-    categoryId: 5,
-    name: "Açaí Tradicional",
-    description: "Açaí puro cremoso com granola.",
-    price: 16.9,
-    image: acaiImg,
-  },
-  {
-    id: 9,
-    categoryId: 6,
-    name: "Batata Frita Grande",
-    description: "Porção de 350g crocante.",
-    price: 14.9,
-    image: batataImg,
-  },
-  {
-    id: 10,
-    categoryId: 7,
-    name: "Refrigerante Lata",
-    description: "Lata 350ml gelada.",
-    price: 7.5,
-    image: bebidaImg,
-  },
-  {
-    id: 11,
-    categoryId: 8,
-    name: "Combo Burger + Refri",
-    description: "Hambúrguer artesanal + refrigerante.",
-    price: 29.9,
-    image: burgerImg,
-  },
-];
-
-/* ------------------------------------------------------------------- */
+// IMAGEM NATIVA DO COMBO
+import comboImg from "../../assets/img/combos/combofamilia.png";
 
 export default function Cardapio() {
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [search, setSearch] = useState("");
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [cart, setCart] = useState([]);
-  const [cartOpen, setCartOpen] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [combos, setCombos] = useState([]);
 
-  const addToCart = (item, qty) => {
-    setCart((prev) => {
-      const exists = prev.find((p) => p.id === item.id);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [search, setSearch] = useState("");
+  const [selectedItem, setSelectedItem] = useState(null);
 
-      if (exists) {
-        return prev.map((p) =>
-          p.id === item.id ? { ...p, qty: p.qty + qty } : p
-        );
-      }
+  const [cart, setCart] = useState([]);
+  const [cartOpen, setCartOpen] = useState(false);
 
-      return [...prev, { ...item, qty }];
-    });
+  /* ---------------- LISTENERS BACKEND ---------------- */
 
-    setCartOpen(true);
-  };
+  // 🔥 Categorias (Admin controla ativo/inativo)
+  useEffect(() => {
+    const unsub = listenCategories((list) => setCategories(list));
+    return () => unsub();
+  }, []);
 
-  const filteredProducts = useMemo(() => {
-    return PRODUCTS.filter((prod) => {
-      const matchCategory =
-        !selectedCategory || prod.categoryId === selectedCategory;
-      const matchSearch = prod.name
-        .toLowerCase()
-        .includes(search.toLowerCase());
-      return matchCategory && matchSearch;
-    });
-  }, [selectedCategory, search]);
+  /* ---------------- FILTRAR CATEGORIAS ATIVAS ---------------- */
 
-  return (
-    <div className="cardapio-page">
+  const activeCategories = useMemo(() => {
+    return categories.filter((c) => c.active);
+  }, [categories]);
 
-      {/* HEADER */}
-      <header className="cardapio-header">
-        <div className="cardapio-header-text">
-          <h1>Cardápio</h1>
-          <p>Escolha uma categoria ou pesquise por um item específico.</p>
-        </div>
-      </header>
+  /* ---------------- PRODUTOS ATIVOS E COM CATEGORIA ATIVA ---------------- */
 
-      {/* BUSCA */}
-      <div className="cardapio-search-row">
-        <input
-          type="text"
-          className="search-input"
-          placeholder="Buscar item..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
+  useEffect(() => {
+    const unsub = listenProducts((list) => {
+      const filtered = list.filter((p) => {
+        if (!p.active) return false;
 
-      {/* CATEGORIAS */}
-      <section className="cardapio-section">
-        <div className="section-header">
-          <h2>Categorias</h2>
-          {selectedCategory && (
-            <button
-              className="btn-clear-filter"
-              onClick={() => setSelectedCategory(null)}
-            >
-              Limpar filtro
-            </button>
-          )}
-        </div>
+        // Descobre categoria do produto
+        const cat =
+          categories.find((c) => c.id === p.categoryId) ||
+          categories.find((c) => c.name === p.category);
 
-        <div className="categories-row">
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat.id}
-              className={`category-item ${selectedCategory === cat.id ? "active" : ""
-                }`}
-              onClick={() =>
-                setSelectedCategory(
-                  selectedCategory === cat.id ? null : cat.id
-                )
-              }
-            >
-              <div className="category-thumb">
-                <img src={cat.image} alt={cat.name} />
-              </div>
-              <span>{cat.name}</span>
-            </button>
-          ))}
-        </div>
-      </section>
+        if (!cat?.active) return false; // categoria inativa → produto some
 
-      {/* PRODUTOS */}
-      <section className="cardapio-section">
-        <div className="section-header">
-          <h2>Itens do cardápio</h2>
-          <span className="items-count">{filteredProducts.length} itens</span>
-        </div>
+        return true;
+      });
 
-        <div className="products-grid">
-          {filteredProducts.length === 0 ? (
-            <p className="no-products">Nenhum item encontrado.</p>
-          ) : (
-            filteredProducts.map((prod) => {
-              const inCart = cart.some((c) => c.id === prod.id);
+      setProducts(filtered);
+    });
 
-              return (
-                <article
-                  key={prod.id}
-                  className={`product-card ${inCart ? "in-cart" : ""}`}
-                  onClick={() => setSelectedItem(prod)}
-                >
-                  <div className="product-media">
-                    <img src={prod.image} alt={prod.name} />
-                  </div>
+    return () => unsub();
+  }, [categories]);
 
-                  <div className="product-body">
-                    <h3>{prod.name}</h3>
-                    <p className="description">{prod.description}</p>
+  /* ---------------- COMBOS ATIVOS, COM CATEGORIA ATIVA E COM ITENS VÁLIDOS ---------------- */
 
-                    <div className="product-footer">
-                      <span className="price">
-                        R$ {prod.price.toFixed(2).replace(".", ",")}
-                      </span>
-                    </div>
-                  </div>
+  useEffect(() => {
+    const unsub = listenCombos((list) => {
+      const filtered = list
+        .filter((c) => c.active) // combo preciso estar ativo
+        .filter((combo) => {
+          // categoria do combo precisa estar ativa
+          const cat = categories.find((x) => x.name === combo.category);
+          if (!cat?.active) return false;
 
-                  {/* BADGE VISUAL */}
-                  {inCart && <div className="in-cart-badge">Já no carrinho ✓</div>}
-                </article>
-              );
-            })
-          )}
-        </div>
-      </section>
+          // todos os itens devem ser ativos
+          const allItemsActive = combo.items.every((item) => {
+            const prod = products.find((p) => p.id === item.id);
+            return prod?.active;
+          });
 
-      {/* MODAL DETALHES */}
-      {selectedItem && (
-        <DetailsModal
-          item={selectedItem}
-          onClose={() => setSelectedItem(null)}
-          onAdd={addToCart}
-        />
-      )}
+          return allItemsActive;
+        })
+        .map((c) => ({ ...c, isCombo: true }));
 
-      <CartButton
-        count={cart.reduce((acc, item) => acc + item.qty, 0)}
-        onClick={() => setCartOpen(true)}
-      />
+      setCombos(filtered);
+    });
 
-      <CartSidebar
-        open={cartOpen}
-        cart={cart}
-        setCart={setCart}
-        onClose={() => setCartOpen(false)}
-      />
+    return () => unsub();
+  }, [categories, products]);
+
+  /* ---------------- FUNÇÃO PARA PEGAR O MENOR PREÇO DO PRODUTO ---------------- */
+
+  const getMinPrice = (item) => {
+    // 1. Se for Combo, usa o preço final/original do Combo
+    if (item.isCombo) return item.finalPrice || item.price || item.originalPrice || 0;
+    
+    // 2. Se for Produto, procura o menor preço nos 'sizes'
+    if (!item.sizes || item.sizes.length === 0) return 0;
+
+    const prices = item.sizes.map((s) => s.price);
+    return Math.min(...prices);
+  };
 
 
-    </div>
-  );
+  /* ---------------- CATEGORIA NATIVA “COMBOS” (apenas se houver combos válidos) ---------------- */
+
+  const nativeComboCategory =
+    combos.length > 0
+      ? {
+          id: "native-combos",
+          name: "Combos",
+          imageUrl: comboImg,
+        }
+      : null;
+
+  const finalCategories = nativeComboCategory
+    ? [...activeCategories, nativeComboCategory]
+    : [...activeCategories];
+
+  /* ---------------- UNIFICA PRODUTOS E COMBOS (APLICA O MENOR PREÇO) ---------------- */
+
+  const normalizedItems = useMemo(() => {
+    return [...products, ...combos].map((item) => ({
+      ...item,
+      displayPrice: getMinPrice(item), // 🔥 AGORA USAMOS A FUNÇÃO getMinPrice
+    }));
+  }, [products, combos]);
+
+  /* ---------------- FILTRAGEM DE ITENS ---------------- */
+
+  const filteredItems = useMemo(() => {
+    return normalizedItems.filter((item) => {
+      const matchCategory =
+        !selectedCategory ||
+
+        // produtos por categoryId
+        String(item.categoryId) === String(selectedCategory) ||
+
+        // produtos por nome da categoria
+        String(item.category) ===
+          String(activeCategories.find((c) => c.id === selectedCategory)?.name) ||
+
+        // combos quando clica em “Combos”
+        (selectedCategory === "native-combos" && item.isCombo);
+
+      const matchSearch =
+        item.name?.toLowerCase().includes(search.toLowerCase());
+
+      return matchCategory && matchSearch;
+    });
+  }, [normalizedItems, selectedCategory, search, activeCategories]);
+
+  /* ---------------- CARRINHO ---------------- */
+
+  const addToCart = (item, qty) => {
+    setCart((prev) => {
+      const exists = prev.find((p) => p.id === item.id);
+
+      if (exists) {
+        return prev.map((p) =>
+          p.id === item.id ? { ...p, qty: p.qty + qty } : p
+        );
+      }
+
+      return [...prev, { ...item, qty }];
+    });
+
+    setCartOpen(true);
+  };
+
+  /* ------------------------------------------------------------------- */
+
+  return (
+    <div className="cardapio-page">
+      {/* HEADER */}
+      <header className="cardapio-header">
+        <div className="cardapio-header-text">
+          <h1>Cardápio</h1>
+          <p>Escolha uma categoria ou pesquise por um item específico.</p>
+        </div>
+      </header>
+
+      {/* BUSCA */}
+      <div className="cardapio-search-row">
+        <input
+          type="text"
+          className="search-input"
+          placeholder="Buscar item..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
+      {/* CATEGORIAS */}
+      <section className="cardapio-section">
+        <div className="section-header">
+          <h2>Categorias</h2>
+          {selectedCategory && (
+            <button
+              className="btn-clear-filter"
+              onClick={() => setSelectedCategory(null)}
+            >
+              Limpar filtro
+            </button>
+          )}
+        </div>
+
+        <div className="categories-row">
+          {finalCategories.map((cat) => (
+            <button
+              key={cat.id}
+              className={`category-item ${
+                selectedCategory === cat.id ? "active" : ""
+              }`}
+              onClick={() =>
+                setSelectedCategory(
+                  selectedCategory === cat.id ? null : cat.id
+                )
+              }
+            >
+              <div className="category-thumb">
+                <img src={cat.image || cat.imageUrl} alt={cat.name} />
+              </div>
+              <span>{cat.name}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* ITENS */}
+      <section className="cardapio-section">
+        <div className="section-header">
+          <h2>Itens do cardápio</h2>
+          <span className="items-count">{filteredItems.length} itens</span>
+        </div>
+
+        <div className="products-grid">
+          {filteredItems.length === 0 ? (
+            <p className="no-products">Nenhum item encontrado.</p>
+          ) : (
+            filteredItems.map((prod) => {
+              const inCart = cart.some((c) => c.id === prod.id);
+              // Verifica se é um produto com mais de 1 tamanho para exibir "A partir de"
+              const isSizedProduct = prod.sizes && prod.sizes.length > 1;
+
+              return (
+                <article
+                  key={prod.id}
+                  className={`product-card ${inCart ? "in-cart" : ""}`}
+                  onClick={() => setSelectedItem(prod)}
+                >
+                  <div className="product-media">
+                    <img
+                      src={prod.image || prod.imageUrl}
+                      alt={prod.name}
+                    />
+                  </div>
+
+                  <div className="product-body">
+                    <h3>{prod.name}</h3>
+                    <p className="description">{prod.description}</p>
+
+                    <div className="product-footer">
+                      <span className="price">
+                        {isSizedProduct && "A partir de "}
+                        {prod.displayPrice.toLocaleString("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        })}
+                      </span>
+                    </div>
+                  </div>
+
+                  {inCart && (
+                    <div className="in-cart-badge">Já no carrinho ✓</div>
+                  )}
+                </article>
+              );
+            })
+          )}
+        </div>
+      </section>
+
+      {/* MODAL */}
+      {selectedItem && (
+        <DetailsModal
+          item={selectedItem}
+          onClose={() => setSelectedItem(null)}
+          onAdd={addToCart}
+        />
+      )}
+
+      {/* CARRINHO */}
+      <CartButton
+        count={cart.reduce((acc, item) => acc + item.qty, 0)}
+        onClick={() => setCartOpen(true)}
+      />
+
+      <CartSidebar
+        open={cartOpen}
+        cart={cart}
+        setCart={setCart}
+        onClose={() => setCartOpen(false)}
+      />
+    </div>
+  );
 }

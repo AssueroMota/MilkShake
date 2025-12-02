@@ -11,7 +11,7 @@ const Sidebar = () => {
   return (
     <>
       {/* BOTÃO HAMBÚRGUER (visível no mobile) */}
-<button className="hamburger-btn" onClick={() => setOpen(true)} />
+      <button className="hamburger-btn" onClick={() => setOpen(true)} />
 
       {/* OVERLAY ESCURO */}
       {open && <div className="sidebar-overlay" onClick={() => setOpen(false)} />}
@@ -94,32 +94,32 @@ const Sidebar = () => {
             <span className="menu-text">Dashboard</span>
           </Link>
 
-          <Link
+          {/* <Link
             to="/adicionais"
             onClick={() => setOpen(false)}
             className={isActive("/adicionais") ? "menu-item active" : "menu-item"}
           >
             <span className="menu-icon adicionais-icon" />
             <span className="menu-text">Adicionais</span>
-          </Link>
+          </Link> */}
 
-          <Link
+          {/* <Link
             to="/promocoes"
             onClick={() => setOpen(false)}
             className={isActive("/promocoes") ? "menu-item active" : "menu-item"}
           >
             <span className="menu-icon promocoes-icon" />
             <span className="menu-text">Promoções</span>
-          </Link>
+          </Link> */}
 
-          <Link
+          {/* <Link
             to="/configuracoes"
             onClick={() => setOpen(false)}
             className={isActive("/configuracoes") ? "menu-item active" : "menu-item"}
           >
             <span className="menu-icon config-icon" />
             <span className="menu-text">Configurações</span>
-          </Link>
+          </Link> */}
 
           <Link to="/" onClick={() => setOpen(false)} className="menu-item">
             <span className="menu-icon sair-icon" />

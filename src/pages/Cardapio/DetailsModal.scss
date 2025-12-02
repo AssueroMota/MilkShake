@@ -31,7 +31,7 @@
   position: absolute;
   top: 14px;
   right: 14px;
-  background: rgba(0,0,0,0.07);
+  background: rgba(0, 0, 0, 0.07);
   border: none;
   font-size: 18px;
   width: 32px;
@@ -41,7 +41,7 @@
   transition: 0.2s;
 
   &:hover {
-    background: rgba(0,0,0,0.12);
+    background: rgba(0, 0, 0, 0.12);
     transform: scale(1.1);
   }
 }
@@ -184,8 +184,13 @@
 /* ANIMAÇÕES */
 /* ========================= */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes scaleIn {
@@ -193,8 +198,186 @@
     opacity: 0;
     transform: scale(0.92);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+
+/* ========================================================= */
+/* SCSS para DetailsModal.jsx */
+/* ========================================================= */
+
+.details-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.details-modal {
+  background-color: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+.close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #f0f0f0;
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+  cursor: pointer;
+  z-index: 10;
+  line-height: 1;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: #e0e0e0;
+  }
+}
+
+.details-image {
+  width: 100%;
+  height: 200px;
+  /* Altura fixa para a imagem */
+  overflow: hidden;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  margin-top: 2rem;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.details-info {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+
+  h2 {
+    font-size: 1.8em;
+    margin: 0;
+    color: #333;
+  }
+
+  .description {
+    font-size: 1em;
+    color: #666;
+    margin: 0;
+  }
+}
+
+/* ----------------------------------- */
+/* SELEÇÃO DE TAMANHO (CORREÇÃO DE BOLINHAS) */
+/* ----------------------------------- */
+
+/* ----------------------------------- */
+/* SELEÇÃO DE TAMANHO OTIMIZADA */
+/* ----------------------------------- */
+
+.size-selection {
+  margin: 15px 0;
+  /* Aumentei um pouco a margem para separar */
+
+  h3 {
+    font-size: 1.1em;
+    margin-bottom: 10px;
+    color: #333;
+    text-align: center;
+    /* Centralizei o título para seguir o layout de info */
+    font-weight: 600;
+  }
+
+  .size-options {
+    display: flex;
+    justify-content: center;
+    /* Centraliza os botões */
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .size-btn {
+    background-color: #f2f2f2;
+    /* Cor de fundo clara do .qty-btn */
+    border: 2px solid #f2f2f2;
+    border-radius: 10px;
+    /* Arredondamento similar ao .qty-btn */
+    padding: 6px 12px;
+    /* Reduzi o padding para botões menores */
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    // ❌ Removido: min-width: 90px;
+
+    &:before,
+    &:after {
+      content: none !important;
+    }
+
+    &:hover:not(.active) {
+      background-color: #e0e0e0;
+      border-color: #e0e0e0;
+    }
+
+    &.active {
+      // 🔥 COR PRINCIPAL DO SISTEMA: ROXO
+      background-color: #7c3aed;
+      color: white;
+      border-color: #7c3aed;
+      box-shadow: 0 4px 10px rgba(124, 58, 237, 0.25);
+      /* Sombra roxa */
+
+      .size-price {
+        color: white;
+        font-weight: 700;
+      }
+    }
+  }
+
+  .size-name {
+    font-weight: 600;
+    font-size: 0.9em;
+    /* Levemente menor */
+    margin-bottom: 2px;
+    color: #333;
+
+    .size-btn.active & {
+      color: white;
+    }
+  }
+
+  .size-price {
+    font-size: 0.8em;
+    /* Levemente menor */
+    color: #666;
+    transition: color 0.2s;
   }
 }

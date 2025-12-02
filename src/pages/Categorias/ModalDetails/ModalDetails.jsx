@@ -1,3 +1,4 @@
+// ModalDetails.jsx
 import React from "react";
 import "./ModalDetails.scss";
 
@@ -8,21 +9,17 @@ const ModalDetails = ({ open, category, onClose }) => {
     <div className="modal-overlay">
       <div className="modal-details-card">
 
-        {/* HEADER */}
         <div className="details-header">
           <h2>Detalhes da Categoria</h2>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
 
-        {/* BODY */}
         <div className="details-body">
 
-          {/* IMAGEM */}
           <div className="details-image">
-            <img src={category.image} alt={category.name} />
+            <img src={category.imageUrl} alt={category.name} />
           </div>
 
-          {/* INFO */}
           <div className="details-info">
             <h3 className="details-title">{category.name}</h3>
 
@@ -39,7 +36,6 @@ const ModalDetails = ({ open, category, onClose }) => {
           </div>
         </div>
 
-        {/* FOOTER */}
         <div className="details-footer">
           <button className="btn-close" onClick={onClose}>
             Fechar

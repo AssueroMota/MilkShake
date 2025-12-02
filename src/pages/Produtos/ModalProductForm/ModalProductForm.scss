@@ -228,3 +228,86 @@
     transform: translateX(22px);
   }
 }
+
+/* =============================== */
+/*   ÁREA DE TAMANHOS E PREÇOS     */
+/* =============================== */
+
+.form-group {
+  .sizes-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+
+    input {
+      padding: 10px;
+      border: 1px solid #dcdcdc;
+      border-radius: 6px;
+      background: #fff;
+      font-size: 14px;
+      outline: none;
+      transition: all 0.2s ease;
+
+      &:focus {
+        border-color: #8a2be2;
+        box-shadow: 0 0 0 2px rgba(138, 43, 226, 0.15);
+      }
+    }
+
+    /* Campo do tamanho */
+    input:first-child {
+      width: 120px;
+      text-transform: uppercase;
+    }
+
+    /* Campo do preço */
+    input:nth-child(2) {
+      width: 120px;
+    }
+
+    /* Botão remover */
+    .remove-size {
+      background: #ff4d4d;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      color: white;
+      font-weight: bold;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      &:hover {
+        background: #d93636;
+        transform: scale(1.06);
+      }
+    }
+  }
+
+  /* Botão adicionar tamanho */
+  .add-size {
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: #8a2be2;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: 0.2s ease;
+
+    &:hover {
+      background: #7425be;
+    }
+
+    &:active {
+      transform: scale(0.98);
+    }
+  }
+}

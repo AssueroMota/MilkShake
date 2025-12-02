@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from "react";
 import "./ModalCategoryForm.scss";
 
-const ModalCategoryForm = ({ open, category, mode, onClose, onSave }) => {
+import { uploadImage } from "../../../services/cloudinary";
+import { createCategory, updateCategory } from "../../../services/categories";
+
+const ModalCategoryForm = ({ open, mode, category, onClose }) => {
   const [form, setForm] = useState({
     name: "",
     active: true,
-    image: null,
+    imageFile: null,
     preview: null,
+    oldPublicId: null,
   });
 
   useEffect(() => {
@@ -14,8 +18,9 @@ const ModalCategoryForm = ({ open, category, mode, onClose, onSave }) => {
       setForm({
         name: category.name,
         active: category.active,
-        image: null,
-        preview: category.image,
+        preview: category.imageUrl,
+        oldPublicId: category.imagePublicId,
+        imageFile: null,
       });
     }
   }, [category]);
@@ -28,42 +33,59 @@ const ModalCategoryForm = ({ open, category, mode, onClose, onSave }) => {
 
     setForm((prev) => ({
       ...prev,
-      image: file,
+      imageFile: file,
       preview: URL.createObjectURL(file),
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    onSave({
+    let imageUrl = category?.imageUrl || "";
+    let imagePublicId = category?.imagePublicId || "";
+
+    // 🔥 Enviar nova imagem SE o usuário trocar
+    if (form.imageFile) {
+      const uploaded = await uploadImage(form.imageFile, "categories");
+      imageUrl = uploaded.url;
+      imagePublicId = uploaded.publicId;
+
+      console.log("⚠️ DEBUG: antiga", form.oldPublicId);
+      console.log("⚠️ DEBUG: nova", imagePublicId);
+    }
+
+    const payload = {
       name: form.name,
       active: form.active,
-      image: form.image,
-      preview: form.preview,
-    });
+      imageUrl,
+      imagePublicId,
+    };
+
+    if (mode === "add") {
+      await createCategory(payload);
+    } else {
+      await updateCategory(category.id, payload);
+    }
+
+    onClose();
   };
 
   return (
     <div className="modal-overlay fade-in">
       <div className="modal-form slide-up">
 
-        {/* HEADER */}
         <div className="modal-form-header">
-          <h2>
-            {mode === "add" ? "Adicionar Categoria" : "Editar Categoria"}
-          </h2>
+          <h2>{mode === "add" ? "Adicionar Categoria" : "Editar Categoria"}</h2>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
 
-        {/* BODY */}
         <form className="modal-form-body" onSubmit={handleSubmit}>
-          
-          {/* LEFT - IMAGE */}
+
           <div className="form-left">
+
             <div className="image-box">
               {form.preview ? (
-                <img src={form.preview} alt="preview" />
+                <img src={form.preview} alt="" />
               ) : (
                 <span className="placeholder">Sem Imagem</span>
               )}
@@ -82,7 +104,7 @@ const ModalCategoryForm = ({ open, category, mode, onClose, onSave }) => {
                   type="checkbox"
                   checked={form.active}
                   onChange={(e) =>
-                    setForm((prev) => ({ ...prev, active: e.target.checked }))
+                    setForm((p) => ({ ...p, active: e.target.checked }))
                   }
                 />
                 <span className="slider"></span>
@@ -90,7 +112,6 @@ const ModalCategoryForm = ({ open, category, mode, onClose, onSave }) => {
             </div>
           </div>
 
-          {/* RIGHT - NAME */}
           <div className="form-right">
             <div className="form-group">
               <label>Nome da Categoria</label>
@@ -98,7 +119,7 @@ const ModalCategoryForm = ({ open, category, mode, onClose, onSave }) => {
                 type="text"
                 value={form.name}
                 onChange={(e) =>
-                  setForm((prev) => ({ ...prev, name: e.target.value }))
+                  setForm((p) => ({ ...p, name: e.target.value }))
                 }
                 required
               />
@@ -107,14 +128,9 @@ const ModalCategoryForm = ({ open, category, mode, onClose, onSave }) => {
 
         </form>
 
-        {/* FOOTER */}
         <div className="modal-form-footer">
-          <button className="btn-secondary" onClick={onClose}>
-            Cancelar
-          </button>
-          <button className="btn-primary" onClick={handleSubmit}>
-            Salvar
-          </button>
+          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn-primary" onClick={handleSubmit}>Salvar</button>
         </div>
 
       </div>

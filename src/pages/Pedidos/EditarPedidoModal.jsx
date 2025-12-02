@@ -1,94 +1,114 @@
-import React, { useState, useMemo } from "react";
+// src/pages/Pedidos/EditarPedidoModal.jsx
+import React, { useEffect, useState, useMemo } from "react";
 import "./EditarPedidoModal.scss";
-import burgerImg from "../../assets/img/produtos/burger.png";
-import batataImg from "../../assets/img/produtos/batata.png";
-import bebidaImg from "../../assets/img/produtos/bebidas.png";
-import milkImg from "../../assets/img/produtos/milk.png";
-import acaiImg from "../../assets/img/produtos/acai.png";
-import pizzaImg from "../../assets/img/produtos/pizza.png";
-import sorveteImg from "../../assets/img/produtos/sorvete.png";
+
+import { listenProducts } from "../../services/products";
+import { listenCombos } from "../../services/combos";
+import { listenCategories } from "../../services/categories";
 
 export default function EditarPedidoModal({ pedido, onClose, onSave }) {
+  const SOMENTE_LEITURA = pedido.status === "finalizado";
+
   const [search, setSearch] = useState("");
-  const [itens, setItens] = useState(pedido.itens);
+  const [itens, setItens] = useState(pedido.itens || []);
 
-const TODOS_PRODUTOS = [
-  {
-    name: "Hambúrguer Artesanal",
-    categoria: "Hambúrgueres",
-    price: 24.9,
-    image: burgerImg
-  },
-  {
-    name: "Batata Frita Grande",
-    categoria: "Porções",
-    price: 14.9,
-    image: batataImg
-  },
-  {
-    name: "Refrigerante Lata",
-    categoria: "Bebidas",
-    price: 7.5,
-    image: bebidaImg
-  },
-  {
-    name: "Milk-shake Morango",
-    categoria: "Milk-shakes",
-    price: 18.9,
-    image: milkImg
-  },
-  {
-    name: "Açaí na Tigela",
-    categoria: "Açaí",
-    price: 16.9,
-    image: acaiImg
-  },
-  {
-    name: "Pizza Margherita",
-    categoria: "Pizzas",
-    price: 32.9,
-    image: pizzaImg
-  },
-  {
-    name: "Sorvete Baunilha",
-    categoria: "Sorvetes",
-    price: 12.9,
-    image: sorveteImg
-  }
-];
+  const [produtos, setProdutos] = useState([]);
+  const [combos, setCombos] = useState([]);
+  const [categorias, setCategorias] = useState([]);
 
+  /* 🔥 LISTENERS DO BACKEND */
+  useEffect(() => {
+    const unsub1 = listenProducts((list) =>
+      setProdutos(list.filter((p) => p.active))
+    );
 
-  const selecionado = (name) => itens.some((i) => i.name === name);
+    const unsub2 = listenCombos((list) =>
+      setCombos(list.map((c) => ({ ...c, isCombo: true })))
+    );
+
+    const unsub3 = listenCategories((list) =>
+      setCategorias(list.filter((c) => c.active))
+    );
+
+    return () => {
+      unsub1();
+      unsub2();
+      unsub3();
+    };
+  }, []);
+
+  /* 🔥 NORMALIZAR PRODUTOS */
+  const TODOS = useMemo(() => {
+    return [...produtos, ...combos].map((item) => ({
+      id: item.id,
+      name: item.name,
+      price: item.finalPrice ?? item.price ?? item.originalPrice ?? 0,
+      image: item.imageUrl || item.image || "",
+      categoria: item.categoryId || (item.isCombo ? "combos" : null),
+      isCombo: item.isCombo || false,
+    }));
+  }, [produtos, combos]);
+
+  const getCategoryName = (catId) => {
+    if (!catId) return "Sem categoria";
+    if (catId === "combos") return "Combos";
+
+    return categorias.find((c) => c.id === catId)?.name || "Sem categoria";
+  };
+
+  /* 🔍 Filtragem */
+  const filtrados = useMemo(() => {
+    return TODOS.filter((p) =>
+      p.name.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [search, TODOS]);
+
+  /* 🔥 SELEÇÃO */
+  const selecionado = (id) => itens.some((i) => i.id === id);
 
   const toggleItem = (prod) => {
-    if (selecionado(prod.name)) {
-      setItens((prev) => prev.filter((i) => i.name !== prod.name));
+    if (SOMENTE_LEITURA) return;
+
+    if (selecionado(prod.id)) {
+      setItens((prev) => prev.filter((i) => i.id !== prod.id));
     } else {
-      setItens((prev) => [...prev, { name: prod.name, qty: 1 }]);
+      setItens((prev) => [
+        ...prev,
+        { id: prod.id, name: prod.name, qty: 1, price: prod.price },
+      ]);
     }
   };
 
-  const editarQtd = (name, delta) => {
+  /* 🔥 EDITAR QUANTIDADE */
+  const editarQtd = (id, delta) => {
+    if (SOMENTE_LEITURA) return;
+
     setItens((prev) =>
       prev.map((i) =>
-        i.name === name ? { ...i, qty: Math.max(1, i.qty + delta) } : i
+        i.id === id ? { ...i, qty: Math.max(1, i.qty + delta) } : i
       )
     );
   };
 
-  const filtrados = useMemo(() => {
-    return TODOS_PRODUTOS.filter((p) =>
-      p.name.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [search]);
-
+  /* 🔥 SALVAR ALTERAÇÕES */
   const salvar = () => {
-    const total = itens.reduce((acc, i) => {
-      const prod = TODOS_PRODUTOS.find((p) => p.name === i.name);
-      return acc + (prod?.price || 0) * i.qty;
-    }, 0);
-    onSave({ ...pedido, itens, total });
+    if (SOMENTE_LEITURA) return;
+
+    const total = itens.reduce((acc, i) => acc + i.qty * i.price, 0);
+
+    onSave({
+      ...pedido,
+      itens,
+      total,
+    });
   };
+
+  /* 🔥 REABRIR NO CAIXA (PDV) */
+  const reenviarParaCaixa = () => {
+    window.location.href = `/caixa?pedido=${pedido.id}`;
+  };
+
+  /* ====================================================== */
 
   return (
     <div className="editar-overlay">
@@ -96,17 +116,32 @@ const TODOS_PRODUTOS = [
 
         <button className="close-btn" onClick={onClose}>✕</button>
 
-        <h2>Editar Pedido #{pedido.id}</h2>
+        {/* TÍTULO */}
+        <h2>Pedido #{pedido.numeroSequencial || pedido.pedidoNumber || "?"}</h2>
 
-        <p className="sub">Selecione ou modifique os itens deste pedido.</p>
+        <p className="sub">
+          {SOMENTE_LEITURA
+            ? "Este pedido já foi finalizado. Apenas visualização."
+            : "Selecione ou modifique itens deste pedido."}
+        </p>
 
-        {/* Top row */}
+        {/* 🔄 BOTÃO REABRIR NO CAIXA */}
+        {SOMENTE_LEITURA && (
+          <div className="btn-container">
+            <button className="btn-reabrir" onClick={reenviarParaCaixa}>
+              Reabrir no Caixa (PDV)
+            </button>
+          </div>
+        )}
+
+        {/* Top bar */}
         <div className="edit-top">
           <input
             type="text"
             className="search"
             placeholder="Buscar produto..."
             value={search}
+            disabled={SOMENTE_LEITURA}
             onChange={(e) => setSearch(e.target.value)}
           />
 
@@ -115,54 +150,67 @@ const TODOS_PRODUTOS = [
           </div>
         </div>
 
-        {/* Lista grande */}
+        {/* LISTA DE PRODUTOS */}
         <div className="lista-produtos">
-          {filtrados.map((prod, idx) => (
-            <div
-              className={`produto-row ${selecionado(prod.name) ? "ativo" : ""}`}
-              key={idx}
-            >
+          {filtrados.map((prod) => {
+            const ativo = selecionado(prod.id);
+            const infoItem = itens.find((i) => i.id === prod.id);
 
-              {/* Checkbox */}
-              <input
-                type="checkbox"
-                checked={selecionado(prod.name)}
-                onChange={() => toggleItem(prod)}
-              />
+            return (
+              <div className={`produto-row ${ativo ? "ativo" : ""}`} key={prod.id}>
 
-              {/* Imagem */}
-              <div className="thumb">
-                <img src={prod.image} alt={prod.name} />
-              </div>
+                <input
+                  type="checkbox"
+                  disabled={SOMENTE_LEITURA}
+                  checked={ativo}
+                  onChange={() => toggleItem(prod)}
+                />
 
-              {/* Nome + categoria */}
-              <div className="info">
-                <strong>{prod.name}</strong>
-                <span>{prod.categoria}</span>
-              </div>
-
-              {/* Preço */}
-              <div className="preco">
-                R$ {prod.price.toFixed(2).replace(".", ",")}
-              </div>
-
-              {/* Quantidade se marcado */}
-              {selecionado(prod.name) && (
-                <div className="qty">
-                  <button onClick={() => editarQtd(prod.name, -1)}>-</button>
-                  <span>{itens.find((i) => i.name === prod.name)?.qty || 1}</span>
-                  <button onClick={() => editarQtd(prod.name, +1)}>+</button>
+                <div className="thumb">
+                  <img src={prod.image} alt={prod.name} />
                 </div>
-              )}
 
-            </div>
-          ))}
+                <div className="info">
+                  <strong>
+                    {prod.name}
+                    {infoItem?.qty ? ` (${infoItem.qty}x)` : ""}
+                  </strong>
+                  <span>{getCategoryName(prod.categoria)}</span>
+                </div>
+
+                <div className="preco">
+                  R$ {prod.price.toFixed(2).replace(".", ",")}
+                </div>
+
+                {/* Quantidade */}
+                {ativo && (
+                  <div className="qty">
+                    {SOMENTE_LEITURA ? (
+                      <span className="qty-readonly">
+                        Qtd: {infoItem?.qty}
+                      </span>
+                    ) : (
+                      <>
+                        <button onClick={() => editarQtd(prod.id, -1)}>-</button>
+                        <span>{infoItem?.qty || 1}</span>
+                        <button onClick={() => editarQtd(prod.id, +1)}>+</button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        <div className="footer">
-          <button className="btn salvar" onClick={salvar}>Salvar alterações</button>
-        </div>
-
+        {/* FOOTER */}
+        {!SOMENTE_LEITURA && (
+          <div className="footer">
+            <button className="btn salvar" onClick={salvar}>
+              Salvar alterações
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

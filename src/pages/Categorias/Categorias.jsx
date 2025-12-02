@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import "./Categorias.scss";
 
 // MODAIS
@@ -6,27 +6,15 @@ import ModalDelete from "./ModalDelete/ModalDelete.jsx";
 import ModalDetails from "./ModalDetails/ModalDetails.jsx";
 import ModalCategoryForm from "./ModalCategoryForm/ModalCategoryForm.jsx";
 
-// IMAGENS DAS CATEGORIAS
-import burgerImg from "../../assets/img/produtos/burger.png";
-import pizzaImg from "../../assets/img/produtos/pizza.png";
-import milkImg from "../../assets/img/produtos/milk.png";
-import sorveteImg from "../../assets/img/produtos/sorvete.png";
-import acaiImg from "../../assets/img/produtos/acai.png";
-import batataImg from "../../assets/img/produtos/batata.png";
-import bebidaImg from "../../assets/img/produtos/bebidas.png";
-
-const initialCategories = [
-  { id: 1, image: burgerImg, name: "Hambúrgueres", active: true },
-  { id: 2, image: pizzaImg, name: "Pizzas", active: true },
-  { id: 3, image: milkImg, name: "Milk-shakes", active: true },
-  { id: 4, image: sorveteImg, name: "Sorvetes", active: true },
-  { id: 5, image: acaiImg, name: "Açaí", active: true },
-  { id: 6, image: batataImg, name: "Porções", active: false },
-  { id: 7, image: bebidaImg, name: "Bebidas", active: true },
-];
+// SERVICES
+import {
+  listenCategories,
+  updateCategory,
+  deleteCategory,
+} from "../../services/categories";
 
 const Categorias = ({ searchQuery }) => {
-  const [categories, setCategories] = useState(initialCategories);
+  const [categories, setCategories] = useState([]);
   const [viewMode, setViewMode] = useState("grid");
 
   // FILTROS
@@ -38,22 +26,27 @@ const Categorias = ({ searchQuery }) => {
   const [detailsModal, setDetailsModal] = useState(null);
   const [categoryFormModal, setCategoryFormModal] = useState(null);
 
-  // LISTA FINAL
+  // 🔥 CARREGA CATEGORIAS EM TEMPO REAL
+  useEffect(() => {
+    const unsubscribe = listenCategories((list) => setCategories(list));
+    return () => unsubscribe && unsubscribe();
+  }, []);
+
+  // 🔵 LISTA FINAL FILTRADA
   const filteredCategories = useMemo(() => {
     let list = [...categories];
 
-    // FILTRO STATUS
+    // FILTRO: status
     if (statusFilter !== "all") {
       list = list.filter((c) =>
         statusFilter === "active" ? c.active : !c.active
       );
     }
 
-    // FILTRO BUSCA
+    // FILTRO: busca
     if (searchQuery?.trim()) {
-      list = list.filter((c) =>
-        c.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      const q = searchQuery.toLowerCase();
+      list = list.filter((c) => c.name.toLowerCase().includes(q));
     }
 
     // ORDENAÇÃO
@@ -63,41 +56,47 @@ const Categorias = ({ searchQuery }) => {
     return list;
   }, [categories, statusFilter, sortBy, searchQuery]);
 
-  // TOGGLE STATUS
-  const toggleStatus = (id) => {
+  // 🔵 TOGGLE ATIVO / INATIVO
+  const toggleStatus = async (id) => {
+    const cat = categories.find((c) => c.id === id);
+    if (!cat) return;
+
+    const newActive = !cat.active;
+
+    // Atualização otimista
     setCategories((prev) =>
-      prev.map((c) =>
-        c.id === id ? { ...c, active: !c.active } : c
-      )
+      prev.map((c) => (c.id === id ? { ...c, active: newActive } : c))
     );
+
+    try {
+      await updateCategory(id, { active: newActive });
+    } catch (err) {
+      console.error(err);
+      // volta ao valor anterior se der erro
+      setCategories((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, active: cat.active } : c))
+      );
+    }
   };
 
-  // DELETE
-  const handleDelete = () => {
-    setCategories((prev) => prev.filter((c) => c.id !== deleteModal.id));
+  // 🔵 DELETE
+  const handleDelete = async () => {
+    try {
+      await deleteCategory(deleteModal.id);
+
+      setCategories((prev) =>
+        prev.filter((c) => c.id !== deleteModal.id)
+      );
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao excluir categoria.");
+    }
+
     setDeleteModal(null);
   };
 
-  // SALVAR (add ou edit)
-  const handleSaveCategory = (data) => {
-    if (categoryFormModal?.mode === "add") {
-      const newCategory = {
-        id: Date.now(),
-        ...data,
-        image: data.preview || burgerImg,
-      };
-
-      setCategories((prev) => [...prev, newCategory]);
-    } else {
-      setCategories((prev) =>
-        prev.map((c) =>
-          c.id === categoryFormModal.category.id
-            ? { ...c, ...data, image: data.preview || c.image }
-            : c
-        )
-      );
-    }
-
+  // FORM — listener já atualiza sozinho
+  const handleSaveCategory = () => {
     setCategoryFormModal(null);
   };
 
@@ -121,7 +120,6 @@ const Categorias = ({ searchQuery }) => {
 
       {/* FILTROS */}
       <div className="categorias-filtros">
-
         <div className="filtro-item">
           <label>Status</label>
           <select
@@ -160,17 +158,18 @@ const Categorias = ({ searchQuery }) => {
             <span className="list-icon" />
           </button>
         </div>
-
       </div>
 
-      {/* GRID VIEW */}
+      {/* GRID */}
       {viewMode === "grid" && (
         <div className="categorias-grid">
           {filteredCategories.map((c) => (
-            <div key={c.id} className="categoria-card">
-
+            <div
+              key={c.id}
+              className={`categoria-card ${!c.active ? "inativo-card" : ""}`}
+            >
               <div className="categoria-img" onClick={() => setDetailsModal(c)}>
-                <img src={c.image} alt={c.name} />
+                <img src={c.imageUrl} alt={c.name} />
               </div>
 
               <div className="categoria-info">
@@ -181,7 +180,6 @@ const Categorias = ({ searchQuery }) => {
                 </span>
               </div>
 
-              {/* AÇÕES */}
               <div className="categoria-actions">
                 <div className="categoria-actions-2">
                   <button
@@ -219,7 +217,7 @@ const Categorias = ({ searchQuery }) => {
         </div>
       )}
 
-      {/* TABLE VIEW */}
+      {/* TABLE */}
       {viewMode === "list" && (
         <table className="categorias-table">
           <thead>
@@ -232,11 +230,9 @@ const Categorias = ({ searchQuery }) => {
 
           <tbody>
             {filteredCategories.map((c) => (
-              <tr key={c.id}>
-
-                {/* IMAGEM + NOME */}
+              <tr key={c.id} className={!c.active ? "inativo-row" : ""}>
                 <td className="td-categoria" onClick={() => setDetailsModal(c)}>
-                  <img src={c.image} alt={c.name} />
+                  <img src={c.imageUrl} alt={c.name} />
                   <div>
                     <strong>{c.name}</strong>
                   </div>
@@ -249,7 +245,6 @@ const Categorias = ({ searchQuery }) => {
                 </td>
 
                 <td className="td-actions">
-
                   <button
                     className="btn-editar"
                     onClick={() =>
@@ -276,7 +271,6 @@ const Categorias = ({ searchQuery }) => {
                     <span className="icon-trash" />
                   </button>
                 </td>
-
               </tr>
             ))}
           </tbody>

@@ -10,8 +10,7 @@ const ModalDelete = ({ open, onClose, onConfirm, product }) => {
         <h2>Excluir Produto</h2>
 
         <p>
-          Tem certeza que deseja excluir <strong>{product?.name}</strong> do
-          cardápio?
+          Tem certeza que deseja excluir <strong>{product?.name}</strong> do cardápio?
         </p>
 
         <div className="modal-actions">
@@ -19,7 +18,10 @@ const ModalDelete = ({ open, onClose, onConfirm, product }) => {
             Cancelar
           </button>
 
-          <button className="btn-confirm" onClick={onConfirm}>
+          <button
+            className="btn-confirm"
+            onClick={() => onConfirm(product.id)}
+          >
             Excluir
           </button>
         </div>

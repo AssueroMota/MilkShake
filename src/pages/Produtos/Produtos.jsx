@@ -1,5 +1,4 @@
-import React, { useMemo, useState } from "react";
-import Layout from "../../components/layout/Layout";
+import React, { useEffect, useMemo, useState } from "react";
 import "./Produtos.scss";
 
 // MODAIS
@@ -7,73 +6,20 @@ import ModalDelete from "./ModalDelete/ModalDelete";
 import ModalDetails from "./ModalDetails/ModalDetails";
 import ModalProductForm from "./ModalProductForm/ModalProductForm";
 
-// IMAGENS
-import burgerImg from "../../assets/img/produtos/burger.png";
-import pizzaImg from "../../assets/img/produtos/pizza.png";
-import milkImg from "../../assets/img/produtos/milk.png";
-import sorveteImg from "../../assets/img/produtos/sorvete.png";
-import acaiImg from "../../assets/img/produtos/acai.png";
-import batataImg from "../../assets/img/produtos/batata.png";
+// SERVICES
+import {
+  listenProducts,
+  deleteProduct,
+  updateProduct,
+  createProduct,
+} from "../../services/products";
 
-const initialProducts = [
-  {
-    id: 1,
-    image: burgerImg,
-    name: "Bacon Burger Deluxe",
-    category: "Hambúrgueres",
-    price: 24.9,
-    active: true,
-    description: "Um hambúrguer artesanal com bacon crocante.",
-  },
-  {
-    id: 2,
-    image: pizzaImg,
-    name: "Pizza Margherita",
-    category: "Pizzas",
-    price: 32.9,
-    active: true,
-    description: "Pizza italiana clássica com manjericão fresco.",
-  },
-  {
-    id: 3,
-    image: milkImg,
-    name: "Milk-shake Morango",
-    category: "Milk-shakes",
-    price: 18.9,
-    active: true,
-    description: "Milk-shake de morango com creme especial.",
-  },
-  {
-    id: 4,
-    image: sorveteImg,
-    name: "Sorvete Baunilha",
-    category: "Sorvetes",
-    price: 12.9,
-    active: false,
-    description: "Sorvete artesanal de baunilha.",
-  },
-  {
-    id: 5,
-    image: acaiImg,
-    name: "Açaí na Tigela",
-    category: "Açaí",
-    price: 16.9,
-    active: true,
-    description: "Tigela de açaí com frutas frescas.",
-  },
-  {
-    id: 6,
-    image: batataImg,
-    name: "Batata Frita Grande",
-    category: "Porções",
-    price: 14.9,
-    active: true,
-    description: "Porção grande de batatas crocantes.",
-  },
-];
+import { listenCategories } from "../../services/categories";
+import { uploadImage } from "../../services/cloudinary";
 
 const Produtos = ({ searchQuery }) => {
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState([]);
+  const [dbCategories, setDbCategories] = useState([]);
   const [viewMode, setViewMode] = useState("grid");
 
   // FILTROS
@@ -86,173 +32,217 @@ const Produtos = ({ searchQuery }) => {
   const [detailsModal, setDetailsModal] = useState(null);
   const [productFormModal, setProductFormModal] = useState(null);
 
-  // CATEGORIAS
+  // 🔄 Produtos em tempo real
+  useEffect(() => {
+    const unsubscribe = listenProducts((list) => setProducts(list));
+    return () => unsubscribe && unsubscribe();
+  }, []);
+
+  // 🔄 Categorias em tempo real
+  useEffect(() => {
+    const unsubscribe = listenCategories((list) => setDbCategories(list));
+    return () => unsubscribe && unsubscribe();
+  }, []);
+
   const categories = useMemo(() => {
-    const set = new Set(products.map((p) => p.category));
-    return ["Todas Categorias", ...Array.from(set)];
-  }, [products]);
+    return ["Todas Categorias", ...dbCategories.map((c) => c.name)];
+  }, [dbCategories]);
 
-  // LISTAGEM FINAL
-const filteredProducts = useMemo(() => {
-  let list = [...products];
+  /* =========================================================
+      FUNÇÃO PARA PEGAR O MENOR PREÇO DO PRODUTO
+  ========================================================= */
+  const getMinPrice = (product) => {
+    if (!product.sizes || product.sizes.length === 0) return 0;
 
-  // FILTRO POR CATEGORIA
-  if (categoryFilter !== "all") {
-    list = list.filter((p) => p.category === categoryFilter);
-  }
-
-  // FILTRO POR STATUS
-  if (statusFilter !== "all") {
-    list = list.filter((p) =>
-      statusFilter === "active" ? p.active : !p.active
-    );
-  }
-
-  // 🔎 FILTRO POR BUSCA (HEADER)
-  if (searchQuery?.trim()) {
-    list = list.filter((p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.description.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }
-
-  // ORDENAÇÃO
-  if (sortBy === "name-asc") list.sort((a, b) => a.name.localeCompare(b.name));
-  if (sortBy === "name-desc") list.sort((a, b) => b.name.localeCompare(a.name));
-  if (sortBy === "price-asc") list.sort((a, b) => a.price - b.price);
-  if (sortBy === "price-desc") list.sort((a, b) => b.price - a.price);
-
-  return list;
-}, [products, categoryFilter, statusFilter, sortBy, searchQuery]);
-
-
-  // TOGGLE STATUS
-  const toggleStatus = (id) => {
-    setProducts((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, active: !p.active } : p
-      )
-    );
+    const prices = product.sizes.map((s) => s.price);
+    return Math.min(...prices);
   };
 
-  // DELETE PRODUTO
-  const handleDelete = () => {
-    setProducts((prev) => prev.filter((p) => p.id !== deleteModal.id));
+  /* =========================================================
+      FILTROS + ORDENAÇÃO
+  ========================================================= */
+  const filteredProducts = useMemo(() => {
+    let list = [...products];
+
+    // Regra global: se categoria está inativa → produto também fica inativo
+    list = list.map((p) => {
+      const cat = dbCategories.find((c) => c.name === p.category);
+      if (cat && cat.active === false) return { ...p, active: false };
+      return p;
+    });
+
+    if (categoryFilter !== "all") {
+      list = list.filter((p) => p.category === categoryFilter);
+    }
+
+    if (statusFilter !== "all") {
+      list = list.filter((p) =>
+        statusFilter === "active" ? p.active : !p.active
+      );
+    }
+
+    if (searchQuery?.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q) ||
+          (p.description || "").toLowerCase().includes(q)
+      );
+    }
+
+    // 🟣 Ordenação por nome
+    if (sortBy === "name-asc") list.sort((a, b) => a.name.localeCompare(b.name));
+    if (sortBy === "name-desc") list.sort((a, b) => b.name.localeCompare(a.name));
+
+    // 🟡 Ordenação por menor preço
+    if (sortBy === "price-asc")
+      list.sort((a, b) => getMinPrice(a) - getMinPrice(b));
+
+    if (sortBy === "price-desc")
+      list.sort((a, b) => getMinPrice(b) - getMinPrice(a));
+
+    return list;
+  }, [products, dbCategories, categoryFilter, statusFilter, sortBy, searchQuery]);
+
+  /* =========================================================
+      ALTERAR STATUS
+  ========================================================= */
+  const toggleStatus = async (product) => {
+    await updateProduct(product.id, { active: !product.active });
+  };
+
+  /* =========================================================
+      REMOVER PRODUTO
+  ========================================================= */
+  const handleDelete = async () => {
+    if (!deleteModal) return;
+    await deleteProduct(deleteModal.id);
     setDeleteModal(null);
   };
 
-  // SALVAR PRODUTO ADD/EDIT
-  const handleSaveProduct = (data) => {
-    if (productFormModal?.mode === "add") {
-      const newProduct = {
-        id: Date.now(),
-        ...data,
-        image: data.preview || burgerImg,
-      };
-      setProducts((prev) => [...prev, newProduct]);
+  /* =========================================================
+      SALVAR PRODUTO (COM TAMANHOS)
+  ========================================================= */
+  const handleSaveProduct = async (data) => {
+    let imageUrl = productFormModal?.product?.imageUrl || null;
+    let imagePublicId = productFormModal?.product?.imagePublicId || null;
+
+    // Upload nova imagem
+    if (data.image) {
+      const uploaded = await uploadImage(data.image, "products");
+      imageUrl = uploaded.url;
+      imagePublicId = uploaded.publicId;
+    }
+
+    const payload = {
+      name: data.name,
+      category: data.category,
+      categoryId: data.categoryId,
+      description: data.description,
+      sizes: data.sizes, // 🔥 agora salvamos os tamanhos
+      active: data.active,
+      imageUrl,
+      imagePublicId,
+    };
+
+    if (productFormModal.mode === "add") {
+      await createProduct(payload);
     } else {
-      setProducts((prev) =>
-        prev.map((p) =>
-          p.id === productFormModal.product.id
-            ? { ...p, ...data, image: data.preview || p.image }
-            : p
-        )
-      );
+      await updateProduct(productFormModal.product.id, payload);
     }
 
     setProductFormModal(null);
   };
 
+  /* =========================================================
+      RENDER
+  ========================================================= */
   return (
-    
-      <div className="produtos-page">
+    <div className="produtos-page">
+      {/* HEADER */}
+      <div className="produtos-header">
+        <h1>Produtos da Loja</h1>
 
-        {/* HEADER */}
-        <div className="produtos-header">
-          <h1>Produtos da Loja</h1>
+        <button
+          className="btn-add"
+          onClick={() => setProductFormModal({ mode: "add", product: null })}
+        >
+          <span className="add-icon" />
+          Adicionar Produto
+        </button>
+      </div>
 
-          <button
-            className="btn-add"
-            onClick={() =>
-              setProductFormModal({ mode: "add", product: null })
+      {/* FILTROS */}
+      <div className="produtos-filtros">
+        <div className="filtro-item">
+          <label>Categoria</label>
+          <select
+            value={categoryFilter}
+            onChange={(e) =>
+              setCategoryFilter(
+                e.target.value === "Todas Categorias" ? "all" : e.target.value
+              )
             }
           >
-            <span className="add-icon" />
-            Adicionar Produto
+            {categories.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="filtro-item">
+          <label>Status</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="all">Todos</option>
+            <option value="active">Ativo</option>
+            <option value="inactive">Inativo</option>
+          </select>
+        </div>
+
+        <div className="filtro-item">
+          <label>Ordenar por</label>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <option value="name-asc">Nome A-Z</option>
+            <option value="name-desc">Nome Z-A</option>
+            <option value="price-asc">Preço menor-maior</option>
+            <option value="price-desc">Preço maior-menor</option>
+          </select>
+        </div>
+
+        <div className="view-buttons">
+          <button
+            className={`view-btn ${viewMode === "grid" ? "active" : ""}`}
+            onClick={() => setViewMode("grid")}
+          >
+            <span className="grid-icon" />
+          </button>
+
+          <button
+            className={`view-btn ${viewMode === "list" ? "active" : ""}`}
+            onClick={() => setViewMode("list")}
+          >
+            <span className="list-icon" />
           </button>
         </div>
+      </div>
 
-        {/* FILTROS */}
-        <div className="produtos-filtros">
+      {/* GRID */}
+      {viewMode === "grid" && (
+        <div className="produtos-grid">
+          {filteredProducts.map((p) => {
+            const minPrice = getMinPrice(p);
 
-          <div className="filtro-item">
-            <label>Categoria</label>
-            <select
-              value={categoryFilter}
-              onChange={(e) =>
-                setCategoryFilter(
-                  e.target.value === "Todas Categorias" ? "all" : e.target.value
-                )
-              }
-            >
-              {categories.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="filtro-item">
-            <label>Status</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="all">Todos</option>
-              <option value="active">Ativo</option>
-              <option value="inactive">Inativo</option>
-            </select>
-          </div>
-
-          <div className="filtro-item">
-            <label>Ordenar por</label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-            >
-              <option value="name-asc">Nome A-Z</option>
-              <option value="name-desc">Nome Z-A</option>
-              <option value="price-asc">Preço menor-maior</option>
-              <option value="price-desc">Preço maior-menor</option>
-            </select>
-          </div>
-
-          {/* Mudar visualização */}
-          <div className="view-buttons">
-            <button
-              className={`view-btn ${viewMode === "grid" ? "active" : ""}`}
-              onClick={() => setViewMode("grid")}
-            >
-              <span className="grid-icon" />
-            </button>
-
-            <button
-              className={`view-btn ${viewMode === "list" ? "active" : ""}`}
-              onClick={() => setViewMode("list")}
-            >
-              <span className="list-icon" />
-            </button>
-          </div>
-        </div>
-
-        {/* ================= GRID VIEW ================= */}
-        {viewMode === "grid" && (
-          <div className="produtos-grid">
-            {filteredProducts.map((p) => (
-              <div key={p.id} className="produto-card">
-
+            return (
+              <div
+                key={p.id}
+                className={`produto-card ${!p.active ? "inativo-card" : ""}`}
+              >
                 <div className="produto-img" onClick={() => setDetailsModal(p)}>
-                  <img src={p.image} alt={p.name} />
+                  {p.imageUrl && <img src={p.imageUrl} alt={p.name} />}
                 </div>
 
                 <div className="produto-info">
@@ -260,7 +250,8 @@ const filteredProducts = useMemo(() => {
                   <p className="categoria">{p.category}</p>
 
                   <p className="preco">
-                    {p.price.toLocaleString("pt-BR", {
+                    A partir de{" "}
+                    {minPrice.toLocaleString("pt-BR", {
                       style: "currency",
                       currency: "BRL",
                     })}
@@ -271,7 +262,6 @@ const filteredProducts = useMemo(() => {
                   </span>
                 </div>
 
-                {/* AÇÕES */}
                 <div className="produto-actions">
                   <div className="produto-actions-2">
                     <button
@@ -280,15 +270,14 @@ const filteredProducts = useMemo(() => {
                         setProductFormModal({ mode: "edit", product: p })
                       }
                     >
-                      <span className="icon-editar" />
-                      Editar
+                      <span className="icon-editar" /> Editar
                     </button>
 
                     <label className="switch">
                       <input
                         type="checkbox"
                         checked={p.active}
-                        onChange={() => toggleStatus(p.id)}
+                        onChange={() => toggleStatus(p)}
                       />
                       <span className="slider"></span>
                     </label>
@@ -303,33 +292,33 @@ const filteredProducts = useMemo(() => {
                     </button>
                   </div>
                 </div>
-
               </div>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
+      )}
 
-        {/* ================= LIST/TABLE VIEW ================= */}
-        {viewMode === "list" && (
-          <table className="produtos-table">
-<thead>
-  <tr>
-    <th>Produto</th>
-    <th>Categoria</th>
-    <th>Preço</th>
-    <th>Status</th>
-    <th style={{ width: "160px" }}>Ações</th>
-  </tr>
-</thead>
+      {/* LISTA */}
+      {viewMode === "list" && (
+        <table className="produtos-table">
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>Categoria</th>
+              <th>Tamanhos</th>
+              <th>Status</th>
+              <th style={{ width: "160px" }}>Ações</th>
+            </tr>
+          </thead>
 
+          <tbody>
+            {filteredProducts.map((p) => {
+              const minPrice = getMinPrice(p);
 
-            <tbody>
-              {filteredProducts.map((p) => (
-                <tr key={p.id}>
-
-                  {/* IMAGEM + NOME */}
+              return (
+                <tr key={p.id} className={!p.active ? "inativo-row" : ""}>
                   <td className="td-produto" onClick={() => setDetailsModal(p)}>
-                    <img src={p.image} alt={p.name} />
+                    {p.imageUrl && <img src={p.imageUrl} alt={p.name} />}
                     <div>
                       <strong>{p.name}</strong>
                       <span className="table-desc">{p.description}</span>
@@ -339,7 +328,8 @@ const filteredProducts = useMemo(() => {
                   <td>{p.category}</td>
 
                   <td className="td-preco">
-                    {p.price.toLocaleString("pt-BR", {
+                    A partir de{" "}
+                    {minPrice.toLocaleString("pt-BR", {
                       style: "currency",
                       currency: "BRL",
                     })}
@@ -351,24 +341,22 @@ const filteredProducts = useMemo(() => {
                     </span>
                   </td>
 
-                  {/* AÇÕES */}
                   <td className="td-actions" onClick={(e) => e.stopPropagation()}>
                     <button
                       className="btn-editar"
-                      onClick={() => {
+                      onClick={(e) => {
                         e.stopPropagation();
                         setProductFormModal({ mode: "edit", product: p });
                       }}
                     >
-                      <span className="icon-editar" />
-                      Editar
+                      <span className="icon-editar" /> Editar
                     </button>
 
                     <label className="switch" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={p.active}
-                        onChange={() => toggleStatus(p.id)}
+                        onChange={() => toggleStatus(p)}
                       />
                       <span className="slider"></span>
                     </label>
@@ -383,44 +371,42 @@ const filteredProducts = useMemo(() => {
                       <span className="icon-trash" />
                     </button>
                   </td>
-
-
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              );
+            })}
+          </tbody>
+        </table>
+      )}
 
-        {/* MODAIS */}
-        {deleteModal && (
-          <ModalDelete
-            open={true}
-            product={deleteModal}
-            onClose={() => setDeleteModal(null)}
-            onConfirm={handleDelete}
-          />
-        )}
+      {/* MODAIS */}
+      {deleteModal && (
+        <ModalDelete
+          open={true}
+          product={deleteModal}
+          onClose={() => setDeleteModal(null)}
+          onConfirm={handleDelete}
+        />
+      )}
 
-        {detailsModal && (
-          <ModalDetails
-            open={true}
-            product={detailsModal}
-            onClose={() => setDetailsModal(null)}
-          />
-        )}
+      {detailsModal && (
+        <ModalDetails
+          open={true}
+          product={detailsModal}
+          onClose={() => setDetailsModal(null)}
+        />
+      )}
 
-        {productFormModal && (
-          <ModalProductForm
-            open={true}
-            product={productFormModal.product}
-            mode={productFormModal.mode}
-            onClose={() => setProductFormModal(null)}
-            onSave={handleSaveProduct}
-          />
-        )}
-
-      </div>
- 
+      {productFormModal && (
+        <ModalProductForm
+          open={true}
+          product={productFormModal.product}
+          mode={productFormModal.mode}
+          onClose={() => setProductFormModal(null)}
+          onSave={handleSaveProduct}
+          categories={dbCategories}
+        />
+      )}
+    </div>
   );
 };
 

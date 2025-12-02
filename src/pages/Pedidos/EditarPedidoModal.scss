@@ -254,8 +254,42 @@ h2 {
     opacity: 0;
     transform: translateY(20px) scale(0.97);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+
+.qty-readonly {
+  font-weight: 600;
+  color: #5a27d5;
+  margin-left: 10px;
+  font-size: 12px;
+  display: none;
+}
+
+.btn-container {
+  display: flex;
+  justify-content: flex-end;
+
+.btn-reabrir {
+  margin-top: 6px;
+  margin-bottom: 16px;
+  padding: 5px 10px;
+  background-color: #6b4ce5;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: 0.2s;
+
+  &:hover {
+    background-color: #593cd0;
+  }
+}
+
 }
