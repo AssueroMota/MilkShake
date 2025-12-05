@@ -466,29 +466,31 @@ export default function Caixa() {
       return;
     }
 
-    const payload = {
-      itens: cart.map((i) => ({
-        productId: i.id,
-        name: i.name,
-        qty: i.quantity,
-        price: i.price,
-        totalItem: i.price * i.quantity,
-        isCombo: i.isCombo,
-        categoryId: i.categoryId,
-        imageUrl: i.imageUrl,
-      })),
-      note,
-      paymentMethod,
-      subtotal: totals.subtotal,
-      deliveryFee: totals.deliveryFee,
-      discountPercent: totals.discountPercent,
-      discountFromPercent: totals.discountFromPercent,
-      discountValueManual: totals.discountValueManual,
-      coupon: appliedCoupon,
-      couponDiscountValue: totals.couponDiscountValue,
-      totalDiscounts: totals.totalDiscounts,
-      total: totals.total,
-    };
+const payload = {
+  itens: cart.map((i) => ({
+    productId: i.id.includes("-") ? i.id.split("-")[0] : i.id, // ✔ ID REAL
+    size: i.size || null,                                       // ✔ salva o tamanho
+    name: i.name,
+    qty: i.quantity,
+    price: i.price,
+    totalItem: i.price * i.quantity,
+    isCombo: i.isCombo,
+    categoryId: i.categoryId,
+    imageUrl: i.imageUrl,
+  })),
+  note,
+  paymentMethod,
+  subtotal: totals.subtotal,
+  deliveryFee: totals.deliveryFee,
+  discountPercent: totals.discountPercent,
+  discountFromPercent: totals.discountFromPercent,
+  discountValueManual: totals.discountValueManual,
+  coupon: appliedCoupon,
+  couponDiscountValue: totals.couponDiscountValue,
+  totalDiscounts: totals.totalDiscounts,
+  total: totals.total,
+};
+
 
     try {
       setSaving(true);
@@ -532,26 +534,6 @@ export default function Caixa() {
   function handlePrintReceipt() {
     window.print();
   }
-
-  function handleSelectSize(size) {
-    const p = sizeModalProduct;
-
-    setCart((prev) => [
-      ...prev,
-      {
-        id: p.id + "-" + size.size,
-        name: `${p.name} (${size.size})`,
-        price: size.price,
-        quantity: 1,
-        size: size.size,
-        categoryId: p.categoryId,
-        imageUrl: p.imageUrl,
-      },
-    ]);
-
-    setSizeModalProduct(null);
-  }
-
 
   /* ---------------------- RENDER ---------------------- */
 

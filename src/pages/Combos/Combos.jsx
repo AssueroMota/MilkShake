@@ -54,12 +54,12 @@ const Combos = ({ searchQuery }) => {
   }, []);
 
   // ======================================
-  // 🔵 OPÇÕES DE CATEGORIA PARA FILTRO
+  // 🔵 SELECT DE CATEGORIAS (apenas ativas)
   // ======================================
   const comboCategories = useMemo(() => {
-    const set = new Set(combos.map((c) => c.category));
-    return ["Todas as Categorias", ...Array.from(set)];
-  }, [combos]);
+    return ["Todas as Categorias", ...categories.filter(c => c.active).map(c => c.name)];
+  }, [categories]);
+
 
   // ======================================
   // 🔵 LISTA FILTRADA + REGRAS DE ACTIVE/INACTIVE
@@ -497,7 +497,7 @@ const Combos = ({ searchQuery }) => {
           onClose={() => setComboFormModal(null)}
           onSave={handleSaveCombo}
           products={products}
-          categories={categories.map((c) => c.name)}
+          categories={categories.filter(c => c.active)}  // 👈 ENVIA APENAS AS ATIVAS E COMO OBJETO
         />
       )}
     </div>

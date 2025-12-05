@@ -11,12 +11,13 @@ const ModalComboForm = ({
   categories = [],
 }) => {
   const [name, setName] = useState("");
-  const [category, setCategory] = useState(categories[0] || "");
+  const [category, setCategory] = useState(categories[0]?.name || "");
+
   const [description, setDescription] = useState("");
   const [active, setActive] = useState(true);
 
   const [imageFile, setImageFile] = useState(null);
-  const [preview, setPreview] = useState(null); // vai mostrar imageUrl
+  const [preview, setPreview] = useState(null); // imageUrl ou file preview
 
   const [discountType, setDiscountType] = useState("none");
   const [discountValue, setDiscountValue] = useState(0);
@@ -26,17 +27,32 @@ const ModalComboForm = ({
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
+  // =========================================================
+  // 🔧 Helper de preço base (usa tamanhos se tiver)
+  // =========================================================
+  const getBasePrice = (product) => {
+    // Se tiver tamanhos (sizes), usamos o menor preço
+    if (product.sizes && product.sizes.length > 0) {
+      const prices = product.sizes.map((s) => Number(s.price || 0));
+      const min = Math.min(...prices);
+      return Number.isFinite(min) ? min : 0;
+    }
+
+    // Fallback: usa product.price se existir
+    const value = Number(product.price || 0);
+    return Number.isFinite(value) ? value : 0;
+  };
+
   // ==========================================
-  // 🔵 PRE-LOAD EM MODO EDIT
+  // 🔵 PRELOAD PARA EDITAR / ADICIONAR
   // ==========================================
   useEffect(() => {
     if (combo) {
       setName(combo.name || "");
-      setCategory(combo.category || categories[0] || "");
+      setCategory(combo.category || categories[0]?.name || "");
       setDescription(combo.description || "");
       setActive(combo.active ?? true);
 
-      // 🔥 AGORA usa a imagem do backend corretamente (imageUrl)
       setPreview(combo.imageUrl || null);
 
       setDiscountType(combo.discountType || "none");
@@ -45,9 +61,9 @@ const ModalComboForm = ({
       setSelectedProductIds(combo.items?.map((i) => i.id) || []);
       setImageFile(null);
     } else {
-      // modo ADD
+      // MODO ADD
       setName("");
-      setCategory(categories[0] || "");
+      setCategory(categories[0]?.name || "");
       setDescription("");
       setActive(true);
       setPreview(null);
@@ -72,10 +88,18 @@ const ModalComboForm = ({
   };
 
   // ==========================================
-  // 🔵 FILTROS DE PRODUTOS
+  // 🔥 FILTRAR SOMENTE PRODUTOS ATIVOS
+  //     (e que pertençam a categorias ativas)
   // ==========================================
   const filteredProducts = useMemo(() => {
-    let list = [...products];
+    let list = products.filter((p) => p.active);
+
+    // Só produtos de categorias presentes em `categories` (que já vêm só ativas)
+    if (categories.length > 0) {
+      list = list.filter((p) =>
+        categories.some((c) => c.name === p.category)
+      );
+    }
 
     if (categoryFilter !== "all") {
       list = list.filter((p) => p.category === categoryFilter);
@@ -91,7 +115,7 @@ const ModalComboForm = ({
     }
 
     return list;
-  }, [products, search, categoryFilter]);
+  }, [products, search, categoryFilter, categories]);
 
   const selectedItems = useMemo(
     () => products.filter((p) => selectedProductIds.includes(p.id)),
@@ -99,10 +123,13 @@ const ModalComboForm = ({
   );
 
   // ==========================================
-  // 🔵 CÁLCULO DE PREÇOS
+  // 🔵 CÁLCULO DE PREÇOS (usando getBasePrice)
   // ==========================================
   const { originalPrice, finalPrice, discountAmount } = useMemo(() => {
-    const total = selectedItems.reduce((sum, p) => sum + Number(p.price || 0), 0);
+    const total = selectedItems.reduce(
+      (sum, p) => sum + getBasePrice(p),
+      0
+    );
 
     let discount = 0;
     if (discountType === "percent") {
@@ -152,22 +179,22 @@ const ModalComboForm = ({
       items: selectedItems.map((i) => ({
         id: i.id,
         name: i.name,
-        price: Number(i.price || 0),
-        image: i.imageUrl, // 🔥 salva imagem do produto
+        // salva o mesmo base price usado nos cálculos
+        price: getBasePrice(i),
+        image: i.imageUrl,
         category: i.category,
       })),
 
       discountType,
-      discountValue: discountType === "none" ? 0 : Number(discountValue || 0),
+      discountValue:
+        discountType === "none" ? 0 : Number(discountValue || 0),
 
-      // os preços calculados serão aplicados no Combos.jsx
+      // Esses totais são só de referência (Combos.jsx recalcula também)
       totalOriginal: Number(originalPrice || 0),
       totalFinal: Number(finalPrice || 0),
 
-      // 🔥 ESSENCIAL — o combo só envia "image: imageFile"
       image: imageFile || null,
-
-      preview, // só para UI
+      preview,
     });
   };
 
@@ -183,12 +210,14 @@ const ModalComboForm = ({
         {/* HEADER */}
         <div className="modal-form-header">
           <h2>{mode === "add" ? "Adicionar Combo" : "Editar Combo"}</h2>
-          <button className="close-btn" onClick={onClose}>×</button>
+          <button className="close-btn" onClick={onClose}>
+            ×
+          </button>
         </div>
 
         {/* BODY */}
         <div className="modal-form-body">
-          {/* COLUNA ESQUERDA */}
+          {/* LEFT */}
           <div className="form-left">
             <div className="image-box">
               {preview ? (
@@ -199,7 +228,11 @@ const ModalComboForm = ({
 
               <label className="btn-upload">
                 Selecionar Imagem
-                <input type="file" accept="image/*" onChange={onFileChange} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={onFileChange}
+                />
               </label>
             </div>
 
@@ -254,9 +287,9 @@ const ModalComboForm = ({
             </div>
           </div>
 
-          {/* COLUNA DIREITA */}
+          {/* RIGHT */}
           <div className="form-right">
-
+            {/* NOME */}
             <div className="form-group">
               <label>Nome do Combo</label>
               <input
@@ -267,15 +300,22 @@ const ModalComboForm = ({
               />
             </div>
 
+            {/* CATEGORIA DO COMBO */}
             <div className="form-group">
               <label>Categoria</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value)}>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
                 {categories.map((c) => (
-                  <option key={c}>{c}</option>
+                  <option key={c.id} value={c.name}>
+                    {c.name}
+                  </option>
                 ))}
               </select>
             </div>
 
+            {/* DESCRIÇÃO */}
             <div className="form-group">
               <label>Descrição (obrigatória)</label>
               <input
@@ -294,7 +334,9 @@ const ModalComboForm = ({
               <div className="discount-modes">
                 <button
                   type="button"
-                  className={`mode-btn ${discountType === "none" ? "active" : ""}`}
+                  className={`mode-btn ${
+                    discountType === "none" ? "active" : ""
+                  }`}
                   onClick={() => setDiscountType("none")}
                 >
                   Sem desconto
@@ -302,7 +344,9 @@ const ModalComboForm = ({
 
                 <button
                   type="button"
-                  className={`mode-btn ${discountType === "percent" ? "active" : ""}`}
+                  className={`mode-btn ${
+                    discountType === "percent" ? "active" : ""
+                  }`}
                   onClick={() => setDiscountType("percent")}
                 >
                   %
@@ -310,7 +354,9 @@ const ModalComboForm = ({
 
                 <button
                   type="button"
-                  className={`mode-btn ${discountType === "value" ? "active" : ""}`}
+                  className={`mode-btn ${
+                    discountType === "value" ? "active" : ""
+                  }`}
                   onClick={() => setDiscountType("value")}
                 >
                   R$
@@ -347,9 +393,7 @@ const ModalComboForm = ({
             {/* PRODUTOS */}
             <div className="products-section">
               <div className="products-header">
-                <div>
-                  <label>Produtos do combo</label>
-                </div>
+                <label>Produtos do combo</label>
 
                 <span className="badge-count">
                   {selectedItems.length} selecionado
@@ -357,6 +401,7 @@ const ModalComboForm = ({
                 </span>
               </div>
 
+              {/* FILTROS */}
               <div className="products-filters">
                 <div className="search-box">
                   <input
@@ -368,30 +413,35 @@ const ModalComboForm = ({
                 </div>
 
                 <div className="category-filter">
-                  <select
-                    value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value)}
-                  >
-                    <option value="all">Todas categorias</option>
-                    {Array.from(new Set(products.map((p) => p.category))).map(
-                      (cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      )
-                    )}
-                  </select>
+ <select
+  value={categoryFilter}
+  onChange={(e) => setCategoryFilter(e.target.value)}
+>
+  <option value="all">Todas categorias</option>
+
+  {categories
+    .filter((c) => c.active)        // 🔥 SOMENTE CATEGORIAS ATIVAS
+    .map((c) => (
+      <option key={c.id} value={c.name}>
+        {c.name}
+      </option>
+    ))}
+</select>
                 </div>
               </div>
 
+              {/* LISTA DE PRODUTOS */}
               <div className="products-list">
                 {filteredProducts.map((p) => {
                   const checked = selectedProductIds.includes(p.id);
+                  const price = getBasePrice(p);
 
                   return (
                     <label
                       key={p.id}
-                      className={`product-item ${checked ? "selected" : ""}`}
+                      className={`product-item ${
+                        checked ? "selected" : ""
+                      }`}
                     >
                       <div className="left">
                         <input
@@ -400,7 +450,6 @@ const ModalComboForm = ({
                           onChange={() => toggleProduct(p.id)}
                         />
 
-                        {/* 🔥 DEVE usar imageUrl (backend) */}
                         <img src={p.imageUrl} alt={p.name} />
 
                         <div className="info">
@@ -411,7 +460,7 @@ const ModalComboForm = ({
 
                       <div className="right">
                         <span className="price">
-                          {Number(p.price).toLocaleString("pt-BR", {
+                          {price.toLocaleString("pt-BR", {
                             style: "currency",
                             currency: "BRL",
                           })}
