@@ -178,6 +178,7 @@ export default function Caixa() {
 
     setPedidoId(id);
 
+    // 🔥 Normalizar itens vindo do editar pedido
     const itensConvertidos = pedido.itens.map((i) => ({
       id: i.productId,
       name: i.name,
@@ -188,9 +189,11 @@ export default function Caixa() {
       categoryId: i.categoryId || null,
     }));
 
+
     setCart(itensConvertidos);
     setNote(pedido.note || "");
   }
+
 
   /* ---------------------- CATEGORIAS NA UI ---------------------- */
 

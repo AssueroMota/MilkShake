@@ -1,4 +1,6 @@
-// src/pages/Pedidos/EditarPedidoModal.jsx
+// -----------------------------------------------------
+//  EDITAR PEDIDO MODAL - VERSÃO COMPLETA e CORRIGIDA
+// -----------------------------------------------------
 import React, { useEffect, useState, useMemo } from "react";
 import "./EditarPedidoModal.scss";
 
@@ -16,7 +18,9 @@ export default function EditarPedidoModal({ pedido, onClose, onSave }) {
   const [combos, setCombos] = useState([]);
   const [categorias, setCategorias] = useState([]);
 
-  /* 🔥 LISTENERS DO BACKEND */
+  /* ---------------------------------------------------------
+      LISTEN FIRESTORE
+  --------------------------------------------------------- */
   useEffect(() => {
     const unsub1 = listenProducts((list) =>
       setProdutos(list.filter((p) => p.active))
@@ -37,52 +41,77 @@ export default function EditarPedidoModal({ pedido, onClose, onSave }) {
     };
   }, []);
 
-  /* 🔥 NORMALIZAR PRODUTOS */
-  const TODOS = useMemo(() => {
-    return [...produtos, ...combos].map((item) => ({
-      id: item.id,
-      name: item.name,
-      price: item.finalPrice ?? item.price ?? item.originalPrice ?? 0,
-      image: item.imageUrl || item.image || "",
-      categoria: item.categoryId || (item.isCombo ? "combos" : null),
-      isCombo: item.isCombo || false,
-    }));
-  }, [produtos, combos]);
+  /* ---------------------------------------------------------
+      FUNÇÃO QUE GARANTE QUE O PREÇO SEMPRE EXISTE
+  --------------------------------------------------------- */
+  const getRealPrice = (item) => {
+    // Caso produto tenha tamanhos
+    if (item.sizes && item.sizes.length > 0) {
+      // pega o menor preço
+      const prices = item.sizes.map(s => Number(s.price) || 0);
+      return Math.min(...prices);
+    }
+
+    return (
+      Number(item.price) ||
+      Number(item.finalPrice) ||
+      Number(item.originalPrice) ||
+      Number(item.value) ||
+      Number(item.unit_price) ||
+      0
+    );
+  };
+
+
+  /* ---------------------------------------------------------
+      NORMALIZAÇÃO DE PRODUTOS E COMBOS
+  --------------------------------------------------------- */
+const TODOS = useMemo(() => {
+  const categoriasAtivasIds = categorias.map((c) => c.id);
+
+  return [...produtos, ...combos].map((item) => ({
+    uid: item.id,
+    id: item.id,
+    name: item.name,
+    price: getRealPrice(item),
+    image: item.imageUrl || item.image || "",
+    categoria: item.categoryId || (item.isCombo ? "combos" : null),
+    active: item.active !== false,
+    categoriaAtiva:
+      item.isCombo ? true : categoriasAtivasIds.includes(item.categoryId),
+  }));
+}, [produtos, combos, categorias]);
+
+
+
 
   const getCategoryName = (catId) => {
     if (!catId) return "Sem categoria";
     if (catId === "combos") return "Combos";
-
     return categorias.find((c) => c.id === catId)?.name || "Sem categoria";
   };
 
-  /* 🔍 Filtragem */
-  const filtrados = useMemo(() => {
-    return TODOS.filter((p) =>
-      p.name.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [search, TODOS]);
+  /* ---------------------------------------------------------
+      SEPARAÇÃO ENTRE ITENS JÁ NO PEDIDO E DISPONÍVEIS
+  --------------------------------------------------------- */
+  const idsNoPedido = itens.map((i) => i.id);
 
-  /* 🔥 SELEÇÃO */
-  const selecionado = (id) => itens.some((i) => i.id === id);
+  const itensDoPedido = itens;
 
-  const toggleItem = (prod) => {
-    if (SOMENTE_LEITURA) return;
+const disponiveis = TODOS.filter(
+  (p) =>
+    p.active &&              // produto ativo
+    p.categoriaAtiva &&      // categoria ativa
+    !idsNoPedido.includes(p.id) &&
+    p.name.toLowerCase().includes(search.toLowerCase())
+);
 
-    if (selecionado(prod.id)) {
-      setItens((prev) => prev.filter((i) => i.id !== prod.id));
-    } else {
-      setItens((prev) => [
-        ...prev,
-        { id: prod.id, name: prod.name, qty: 1, price: prod.price },
-      ]);
-    }
-  };
 
-  /* 🔥 EDITAR QUANTIDADE */
+
+  /* ---------------------------------------------------------
+      FUNÇÕES DE EDIÇÃO
+  --------------------------------------------------------- */
   const editarQtd = (id, delta) => {
-    if (SOMENTE_LEITURA) return;
-
     setItens((prev) =>
       prev.map((i) =>
         i.id === id ? { ...i, qty: Math.max(1, i.qty + delta) } : i
@@ -90,127 +119,152 @@ export default function EditarPedidoModal({ pedido, onClose, onSave }) {
     );
   };
 
-  /* 🔥 SALVAR ALTERAÇÕES */
-  const salvar = () => {
-    if (SOMENTE_LEITURA) return;
+  const removerDoPedido = (id) => {
+    setItens((prev) => prev.filter((i) => i.id !== id));
+  };
 
-    const total = itens.reduce((acc, i) => acc + i.qty * i.price, 0);
+  const adicionarItem = (prod) => {
+    setItens((prev) => [
+      ...prev,
+      {
+        productId: prod.id,                 // 🔥 O PDV precisa disso
+        id: prod.id,                        // mantém compatibilidade interna
+        name: prod.name,
+        qty: 1,
+        price: prod.price,
+        totalItem: prod.price * 1,          // 🔥 usado no PDV
+        imageUrl: prod.image,               // 🔥 garante a imagem no PDV
+        categoryId: prod.categoria || null,
+        isCombo: prod.isCombo || false,
+      },
+    ]);
+  };
+
+
+
+
+  /* ---------------------------------------------------------
+      SALVAR ALTERAÇÕES
+  --------------------------------------------------------- */
+  const salvar = () => {
+    const total = itens.reduce((acc, i) => acc + (i.price * i.qty), 0);
+
+    const itensCorrigidos = itens.map((i) => ({
+      ...i,
+      totalItem: i.price * i.qty,
+    }));
+
 
     onSave({
       ...pedido,
-      itens,
+      itens: itensCorrigidos,
       total,
     });
+
+
+    onClose();
   };
 
-  /* 🔥 REABRIR NO CAIXA (PDV) */
-  const reenviarParaCaixa = () => {
-    window.location.href = `/caixa?pedido=${pedido.id}`;
-  };
-
-  /* ====================================================== */
-
+  /* ---------------------------------------------------------
+      RENDER
+  --------------------------------------------------------- */
   return (
     <div className="editar-overlay">
       <div className="editar-modal">
-
         <button className="close-btn" onClick={onClose}>✕</button>
 
-        {/* TÍTULO */}
-        <h2>Pedido #{pedido.numeroSequencial || pedido.pedidoNumber || "?"}</h2>
+        <h2>Editar Pedido #{pedido.pedidoNumber}</h2>
 
-        <p className="sub">
-          {SOMENTE_LEITURA
-            ? "Este pedido já foi finalizado. Apenas visualização."
-            : "Selecione ou modifique itens deste pedido."}
-        </p>
-
-        {/* 🔄 BOTÃO REABRIR NO CAIXA */}
-        {SOMENTE_LEITURA && (
-          <div className="btn-container">
-            <button className="btn-reabrir" onClick={reenviarParaCaixa}>
-              Reabrir no Caixa (PDV)
-            </button>
-          </div>
-        )}
-
-        {/* Top bar */}
+        {/* BUSCA */}
         <div className="edit-top">
           <input
             type="text"
             className="search"
             placeholder="Buscar produto..."
             value={search}
-            disabled={SOMENTE_LEITURA}
             onChange={(e) => setSearch(e.target.value)}
           />
-
-          <div className="contador">
-            {itens.length} selecionado{itens.length !== 1 && "s"}
-          </div>
+          <div className="contador">{itens.length} itens no pedido</div>
         </div>
 
-        {/* LISTA DE PRODUTOS */}
+        {/* ------------------------- */}
+        {/*  SEÇÃO A — ITENS DO PEDIDO */}
+        {/* ------------------------- */}
+
+        <h3 className="sec-title">Itens do Pedido</h3>
+
         <div className="lista-produtos">
-          {filtrados.map((prod) => {
-            const ativo = selecionado(prod.id);
-            const infoItem = itens.find((i) => i.id === prod.id);
+          {itensDoPedido.map((item) => {
+            const ref = TODOS.find((p) => p.id === item.id);
 
             return (
-              <div className={`produto-row ${ativo ? "ativo" : ""}`} key={prod.id}>
-
-                <input
-                  type="checkbox"
-                  disabled={SOMENTE_LEITURA}
-                  checked={ativo}
-                  onChange={() => toggleItem(prod)}
-                />
-
+              <div className="produto-row ativo" key={item.id}>
                 <div className="thumb">
-                  <img src={prod.image} alt={prod.name} />
+                  <img
+                    src={ref?.image || item.imageUrl || "/placeholder.png"}
+                    alt={item.name}
+                  />
+
                 </div>
 
                 <div className="info">
-                  <strong>
-                    {prod.name}
-                    {infoItem?.qty ? ` (${infoItem.qty}x)` : ""}
-                  </strong>
-                  <span>{getCategoryName(prod.categoria)}</span>
+                  <strong>{item.name}</strong>
+                  <span>{item.qty}x</span>
                 </div>
 
                 <div className="preco">
-                  R$ {prod.price.toFixed(2).replace(".", ",")}
+                  R$ {(item.price * item.qty).toFixed(2).replace(".", ",")}
                 </div>
 
-                {/* Quantidade */}
-                {ativo && (
-                  <div className="qty">
-                    {SOMENTE_LEITURA ? (
-                      <span className="qty-readonly">
-                        Qtd: {infoItem?.qty}
-                      </span>
-                    ) : (
-                      <>
-                        <button onClick={() => editarQtd(prod.id, -1)}>-</button>
-                        <span>{infoItem?.qty || 1}</span>
-                        <button onClick={() => editarQtd(prod.id, +1)}>+</button>
-                      </>
-                    )}
-                  </div>
-                )}
+                <div className="qty">
+                  <button onClick={() => editarQtd(item.id, -1)}>-</button>
+                  <span>{item.qty}</span>
+                  <button onClick={() => editarQtd(item.id, +1)}>+</button>
+                </div>
+
+                <button className="remove-btn" onClick={() => removerDoPedido(item.id)}>
+                  ✕
+                </button>
               </div>
             );
           })}
         </div>
 
-        {/* FOOTER */}
-        {!SOMENTE_LEITURA && (
-          <div className="footer">
-            <button className="btn salvar" onClick={salvar}>
-              Salvar alterações
-            </button>
-          </div>
-        )}
+        {/* ------------------------------- */}
+        {/*  SEÇÃO B — ADICIONAR AO PEDIDO  */}
+        {/* ------------------------------- */}
+
+        <h3 className="sec-title">Adicionar ao Pedido</h3>
+
+        <div className="lista-produtos">
+          {disponiveis.map((prod) => (
+            <div className="produto-row" key={prod.id}>
+              <div className="thumb">
+                <img src={prod.image} alt="" />
+              </div>
+
+              <div className="info">
+                <strong>{prod.name}</strong>
+                <span>{getCategoryName(prod.categoria)}</span>
+              </div>
+
+              <div className="preco">
+                R$ {prod.price.toFixed(2).replace(".", ",")}
+              </div>
+
+              <button className="add-btn" onClick={() => adicionarItem(prod)}>
+                +
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* BOTÃO SALVAR */}
+        <div className="footer">
+          <button className="salvar" onClick={salvar}>
+            Salvar alterações
+          </button>
+        </div>
       </div>
     </div>
   );

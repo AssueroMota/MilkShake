@@ -381,3 +381,113 @@
     transition: color 0.2s;
   }
 }
+
+/* ===========================================
+   SELEÇÃO DE TAMANHOS — NOVO DESIGN PREMIUM
+=========================================== */
+
+.size-selection {
+  margin: 20px 0;
+  text-align: center;
+
+  h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 14px;
+    color: #2d1f41;
+  }
+
+  .size-options {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .size-btn {
+    background: #f4f4f4;
+    border: 2px solid transparent;
+    border-radius: 14px;
+    padding: 10px 18px;
+    min-width: 120px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    text-align: center;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.07);
+
+    /* Texto */
+    .size-name {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #333;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .size-price {
+      font-size: 0.82rem;
+      color: #666;
+    }
+
+    /* Hover — antes da seleção */
+    &:hover:not(.active) {
+      background: #ececec;
+      transform: translateY(-2px);
+    }
+
+    /* ATIVO (selecionado) */
+    &.active {
+      background: #7c3aed;
+      border-color: #6d28d9;
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
+      transform: translateY(-2px);
+
+      .size-name,
+      .size-price {
+        color: #fff;
+      }
+      
+    }
+    
+  }
+  
+}
+
+/* MOBILE AJUSTE */
+@media (max-width: 720px) {
+  .size-selection .size-btn {
+    min-width: 100px;
+    padding: 8px 14px;
+  }
+}
+
+.size-btn {
+  .size-label {
+    strong {
+      color: #333;  // cor padrão
+    }
+    span {
+      color: #666;
+    }
+  }
+
+  &.active {
+    background: #7c3aed;
+    border-color: #7c3aed;
+
+    .size-label strong {
+      color: #fff !important;   // 🔥 deixa MEDIA / GRANDE branco
+    }
+
+    .size-label span {
+      color: #f1e9ff !important; // preço mais claro (opcional)
+    }
+  }
+}

@@ -1,193 +1,311 @@
 // src/pages/Pedidos/Pedidos.jsx
-import React, { useEffect, useState } from "react";
-import EditarPedidoModal from "./EditarPedidoModal.jsx";
+import React, { useState, useMemo, useEffect } from "react";
 import "./Pedidos.scss";
-import StatusBadge from "./StatusBadge.jsx";
 
 import {
   listenPedidos,
   updatePedidoStatus,
+  deletePedido,
   updatePedidoCompleto,
-  deletePedido
 } from "../../services/pedidos";
 
-export default function Pedidos() {
-  const [pedidos, setPedidos] = useState([]);
-  const [editingPedido, setEditingPedido] = useState(null);
-  const [filtroStatus, setFiltroStatus] = useState("abertos");
-  const [busca, setBusca] = useState("");
+import EditarPedidoModal from "./EditarPedidoModal";
 
-  /* 🔥 Listener realtime */
+/* ============================================================
+   COMPONENTE DE STATUS
+============================================================ */
+function StatusBadge({ status }) {
+  const map = {
+    solicitado: { label: "Solicitado", color: "#6D28D9", bg: "#EDE9FE" },
+    preparando: { label: "Preparando", color: "#3B82F6", bg: "#DBEAFE" },
+    concluido: { label: "Concluído", color: "#10B981", bg: "#D1FAE5" },
+    cancelado: { label: "Cancelado", color: "#EF4444", bg: "#FEE2E2" },
+  };
+
+  const st = map[status] || map["solicitado"];
+
+  return (
+    <span
+      className="status-badge"
+      style={{
+        background: st.bg,
+        color: st.color,
+        padding: "4px 10px",
+        borderRadius: "6px",
+        fontWeight: 600,
+        fontSize: "12px",
+      }}
+    >
+      {st.label}
+    </span>
+  );
+}
+
+/* ============================================================
+   COMPONENTE PRINCIPAL
+============================================================ */
+export default function Pedidos() {
+  const [viewMode, setViewMode] = useState("grid");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("todos");
+
+  const [pedidos, setPedidos] = useState([]);
+
+  /* 🔥 LISTENER FIRESTORE */
   useEffect(() => {
-    const unsub = listenPedidos(setPedidos);
+    const unsub = listenPedidos((list) => {
+      const ordenados = list.sort(
+        (a, b) =>
+          (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+      );
+      setPedidos(ordenados);
+    });
+
     return () => unsub();
   }, []);
 
-  /* ===================== Atualizar Status ===================== */
-  const atualizarStatus = async (id, novoStatus) => {
-    await updatePedidoStatus(id, novoStatus);
+  /* 🔧 MODAL */
+  const [selectedPedido, setSelectedPedido] = useState(null);
+  const abrirModal = (pedido) => setSelectedPedido(pedido);
+  const fecharModal = () => setSelectedPedido(null);
+
+  /* ============================================================
+     SALVAR ALTERAÇÕES DO MODAL
+  ============================================================ */
+  const salvarEdicao = async (pedidoAtualizado) => {
+    try {
+      await updatePedidoCompleto(pedidoAtualizado);
+      fecharModal();
+    } catch (err) {
+      console.error("Erro ao salvar edição:", err);
+    }
   };
 
-  /* ===================== Enviar para Caixa ===================== */
-  const irParaCaixa = async (pedido) => {
-    await updatePedidoStatus(pedido.id, "finalizado");
+  /* ============================================================
+     FILTRO FINAL
+  ============================================================ */
+  const pedidosFiltrados = useMemo(() => {
+    return pedidos.filter((p) => {
+      const txt = search.toLowerCase();
+
+      const matchSearch =
+        String(p.pedidoNumber).includes(txt) ||
+        p.itens
+          ?.map((i) => `${i.qty}x ${i.name}`)
+          .join(" ")
+          .toLowerCase()
+          .includes(txt);
+
+      const matchStatus =
+        statusFilter === "todos" || p.status === statusFilter;
+
+      return matchSearch && matchStatus;
+    });
+  }, [search, statusFilter, pedidos]);
+
+  /* ============================================================
+     AÇÕES DOS BOTÕES
+  ============================================================ */
+
+  // ✔ Passar de solicitado → preparando
+  const handleMarcarPreparando = async (pedido) => {
+    await updatePedidoStatus(pedido.id, "preparando");
+  };
+
+  // ✔ Enviar para o Caixa PDV + marcar como concluído
+  const handleEnviarParaCaixa = async (pedido) => {
+    await updatePedidoStatus(pedido.id, "concluido");
     window.location.href = `/caixa?pedido=${pedido.id}`;
   };
 
-  /* ===================== Deletar ===================== */
-  const removerPedido = async (id) => {
-    await deletePedido(id);
+  // ✔ Cancelar pedido
+  const handleDelete = async (pedidoId) => {
+    await deletePedido(pedidoId);
   };
 
-  /* ===================== Salvar edição ===================== */
-  const salvarEdicao = async (pedidoAtualizado) => {
-    await updatePedidoCompleto(pedidoAtualizado);
-    setEditingPedido(null);
-  };
-
-  /* ===================== FILTRO + BUSCA ===================== */
-
-  const pedidosFiltrados = pedidos.filter((p, index) => {
-    const numeroSequencial = String(index + 1).padStart(2, "0");
-    const idCurto = p.id.substring(0, 7);
-
-    const textoBusca = `
-      ${p.id}
-      ${idCurto}
-      ${numeroSequencial}
-      ${p.total}
-      ${p.status}
-      ${p.hora}
-      ${p.itens.map((i) => `${i.qty}x ${i.name}`).join(" ")}
-    `
-      .toLowerCase()
-      .trim();
-
-    const buscaOK = textoBusca.includes(busca.toLowerCase());
-
-    const statusOK =
-      filtroStatus === "abertos"
-        ? p.status !== "finalizado"
-        : p.status === "finalizado";
-
-    return buscaOK && statusOK;
-  });
-
-  /* ===================== RENDER ===================== */
-
+  /* ============================================================
+     RENDER
+  ============================================================ */
   return (
     <div className="pedidos-container">
-      <h1 className="titulo-pedidos">Pedidos</h1>
+      <h1>Pedidos</h1>
 
-      {/* ========= FILTROS ========= */}
-      <div className="filtros-top">
-        <div className="search-box">
-          <input
-            type="text"
-            placeholder="Buscar pedido..."
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-          />
+      {/* TOPO */}
+      <div className="pedidos-top-row">
+        <div className="filtros-top">
+          <div className="search-box">
+            <input
+              type="text"
+              placeholder="Buscar pedido..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <select
+            className="select-pro"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="todos">Todos</option>
+            <option value="solicitado">Solicitado</option>
+            <option value="preparando">Preparando</option>
+            <option value="concluido">Concluído</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
         </div>
 
-        <select
-          className="filtro-status"
-          value={filtroStatus}
-          onChange={(e) => setFiltroStatus(e.target.value)}
-        >
-          <option value="abertos">Abertos</option>
-          <option value="fechados">Fechados</option>
-        </select>
+        <div className="view-buttons">
+          <button
+            className={`view-btn grid ${viewMode === "grid" ? "active" : ""}`}
+            onClick={() => setViewMode("grid")}
+          >
+            <span className="icon grid-icon" />
+          </button>
+
+          <button
+            className={`view-btn list ${viewMode === "list" ? "active" : ""}`}
+            onClick={() => setViewMode("list")}
+          >
+            <span className="icon list-icon" />
+          </button>
+        </div>
       </div>
 
-      {/* CABEÇALHO */}
-      <div className="pedidos-header">
-        <div>Pedido</div>
-        <div>Itens</div>
-        <div>Total</div>
-        <div>Horário</div>
-        <div>Status</div>
-        <div>Ações</div>
-      </div>
+      {/* ======================================================
+          GRID MODE
+      ====================================================== */}
+      {viewMode === "grid" && (
+        <div className="pedidos-grid">
+          {pedidosFiltrados.map((pedido) => (
+            <div key={pedido.id} className="pedido-card">
+              
+              <div className="pedido-header">
+                <h3># {pedido.pedidoNumber}</h3>
+                <StatusBadge status={pedido.status} />
+              </div>
 
-      {pedidosFiltrados.length === 0 && (
-        <p className="nenhum-pedido">Nenhum pedido encontrado.</p>
-      )}
+<div className="pedido-itens">
+  {pedido.itens.slice(0, 3).map((i, idx) => (
+    <div className="item-row" key={idx}>
+      {i.qty}x {i.name}
+    </div>
+  ))}
 
-      {pedidosFiltrados.map((p, index) => {
-        const numeroSequencial = String(index + 1).padStart(2, "0");
+  {pedido.itens.length > 3 && (
+    <div className="more-items">
+      +{pedido.itens.length - 3} itens
+    </div>
+  )}
+</div>
 
-        return (
-          <div className="pedido-row" key={p.id}>
-            {/* Número do pedido */}
-            <div>
-              <strong># {numeroSequencial}</strong>
-            </div>
 
-            {/* Itens */}
-            <div className="itens-col">
-              {p.itens.map((i, idx) => (
-                <div key={idx} className="item-line">
-                  {i.qty}x {i.name}
-                </div>
-              ))}
-            </div>
+              <div className="pedido-info">
+                <span className="hora">{pedido.hora}</span>
+                <span className="total">
+                  R$ {Number(pedido.total).toFixed(2).replace(".", ",")}
+                </span>
+              </div>
 
-            {/* Total */}
-            <div>
-              <strong>
-                R$ {Number(p.total).toFixed(2).replace(".", ",")}
-              </strong>
-            </div>
-
-            {/* Horário */}
-            <div>{p.hora}</div>
-
-            {/* STATUS */}
-            <div>
-              <StatusBadge
-                status={p.status}
-                onChange={(novo) => atualizarStatus(p.id, novo)}
-              />
-            </div>
-
-            {/* Ações */}
-            <div className="acoes-col">
-              <button
-                className="btn icon editar"
-                onClick={() =>
-                  setEditingPedido({ ...p, numeroSequencial })
-                }
-              />
-
-              {p.status === "solicitado" && (
+              <div className="pedido-actions">
                 <button
-                  className="btn icon aceitar"
-                  onClick={() => atualizarStatus(p.id, "andamento")}
+                  className="btn icon editar"
+                  onClick={() => abrirModal(pedido)}
                 />
-              )}
 
-              {p.status === "andamento" && (
+                {pedido.status === "solicitado" && (
+                  <button
+                    className="btn icon aceitar"
+                    onClick={() => handleMarcarPreparando(pedido)}
+                  />
+                )}
+
                 <button
                   className="btn icon caixa"
-                  onClick={() => irParaCaixa(p)}
+                  onClick={() => handleEnviarParaCaixa(pedido)}
                 />
-              )}
 
-              <button
-                className="btn icon deletar"
-                onClick={() => removerPedido(p.id)}
-              />
+                <button
+                  className="btn icon deletar"
+                  onClick={() => handleDelete(pedido.id)}
+                />
+              </div>
             </div>
-          </div>
-        );
-      })}
+          ))}
+        </div>
+      )}
 
-      {/* MODAL EDITAR */}
-      {editingPedido && (
+      {/* ======================================================
+          LIST MODE
+      ====================================================== */}
+      {viewMode === "list" && (
+        <>
+          <div className="pedidos-header">
+            <span>N°</span>
+            <span>Itens</span>
+            <span>Total</span>
+            <span>Hora</span>
+            <span>Status</span>
+            <span>Ações</span>
+          </div>
+
+          {pedidosFiltrados.map((pedido) => (
+            <div key={pedido.id} className="pedido-row">
+              <div># {pedido.pedidoNumber}</div>
+
+              <div>
+                {pedido.itens
+                  ?.map((i) => `${i.qty}x ${i.name}`)
+                  .join(", ")}
+              </div>
+
+              <div>
+                <strong>
+                  R$ {Number(pedido.total).toFixed(2).replace(".", ",")}
+                </strong>
+              </div>
+
+              <div>{pedido.hora}</div>
+
+              <div>
+                <StatusBadge status={pedido.status} />
+              </div>
+
+              <div className="acoes-col">
+                <button
+                  className="btn icon editar"
+                  onClick={() => abrirModal(pedido)}
+                />
+
+                {pedido.status === "solicitado" && (
+                  <button
+                    className="btn icon aceitar"
+                    onClick={() => handleMarcarPreparando(pedido)}
+                  />
+                )}
+
+                <button
+                  className="btn icon caixa"
+                  onClick={() => handleEnviarParaCaixa(pedido)}
+                />
+
+                <button
+                  className="btn icon deletar"
+                  onClick={() => handleDelete(pedido.id)}
+                />
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+
+      {/* ======================================================
+          MODAL
+      ====================================================== */}
+      {selectedPedido && (
         <EditarPedidoModal
-          pedido={editingPedido}
-          onClose={() => setEditingPedido(null)}
+          pedido={selectedPedido}
+          onClose={fecharModal}
           onSave={salvarEdicao}
         />
       )}

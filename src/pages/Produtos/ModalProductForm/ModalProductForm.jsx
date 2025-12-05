@@ -28,9 +28,9 @@ const ModalProductForm = ({ open, product, mode, onClose, onSave, categories }) 
         preview: product.imageUrl || null,
         sizes: product.sizes?.length
           ? product.sizes.map((s) => ({
-              size: s.size,
-              price: String(s.price).replace(".", ","),
-            }))
+            size: s.size,
+            price: String(s.price).replace(".", ","),
+          }))
           : [{ size: "", price: "" }],
       });
     }
@@ -168,11 +168,14 @@ const ModalProductForm = ({ open, product, mode, onClose, onSave, categories }) 
                 required
               >
                 <option value="">Selecione...</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
+                {categories
+                  .filter((c) => c.active !== false)   // só mostra categorias ativas
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+
               </select>
             </div>
 

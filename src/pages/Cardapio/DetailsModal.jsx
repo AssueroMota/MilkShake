@@ -100,13 +100,14 @@ export default function DetailsModal({ item, onClose, onAdd }) {
               <div className="size-options">
                 {item.sizes.map((size) => (
                   <button
-                    key={size.name}
-                    className={`size-btn ${selectedSize?.name === size.name ? "active" : ""
-                      }`}
+                    key={size.size}
+                    className={`size-btn ${selectedSize?.size === size.size ? "active" : ""}`}
                     onClick={() => setSelectedSize(size)}
                   >
-                    <span className="size-name">{size.name}</span>
-                    <span className="size-price">{formatPrice(size.price)}</span>
+                    <div className="size-label">
+                      <strong>{size.size}: </strong>
+                      <span>{formatPrice(size.price)}</span>
+                    </div>
                   </button>
                 ))}
               </div>

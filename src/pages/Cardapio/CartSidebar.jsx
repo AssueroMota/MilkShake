@@ -33,40 +33,44 @@ export default function CartSidebar({ open, cart, setCart, onClose }) {
   const clearAll = () => setCart([]);
 
   // Função para enviar o pedido
-  const enviarPedido = async () => {
-    if (cart.length === 0) return;
+ const enviarPedido = async () => {
+  if (cart.length === 0) return;
 
-    const total = cart.reduce((acc, i) => {
-      // Preço já está no item, mas usamos a lógica de fallback por segurança
-      const price = i.price ?? 0;
+  const total = cart.reduce((acc, i) => {
+    const price = i.price ?? 0;
+    return acc + Number(price) * i.qty;
+  }, 0);
 
-      return acc + Number(price) * i.qty;
-    }, 0);
+  const pedido = {
+    itens: cart.map((i) => ({
+      productId: i.id,
+      name: i.name,
+      qty: i.qty,
+      size: i.size || null,
+      price: i.price ?? 0,
+      totalItem: (i.price ?? 0) * i.qty,
 
-    const pedido = {
-      itens: cart.map((i) => ({
-        id: i.id,
-        name: i.name,
-        qty: i.qty,
-        // 🆕 Incluímos o tamanho se ele existir
-        size: i.size || null,
-        price: i.price ?? 0,
-      })),
-      total,
-      hora: new Date().toLocaleTimeString("pt-BR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      status: "solicitado",
-      timestamp: Date.now(),
-      obs: "", // será preenchido pelo cliente se quiser
-    };
+      imageUrl: i.imageUrl || i.image || i.preview || null,
+      categoryId: i.categoryId || null,
+      isCombo: i.isCombo || false,
+    })),
 
-    await createPedido(pedido);
-
-    clearAll();
-    onClose();
+    total,
+    hora: new Date().toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    status: "solicitado",
+    timestamp: Date.now(),
+    obs: "",
   };
+
+  await createPedido(pedido);
+
+  clearAll();
+  onClose();
+};
+
 
   // Helper para formatar o preço
   const formatPrice = (p) =>

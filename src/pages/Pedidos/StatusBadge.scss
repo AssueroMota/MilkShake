@@ -1,28 +1,81 @@
+.status-badge-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+/* BOTÃO BASE */
 .status-badge {
-  padding: 6px 14px;
-  border-radius: 20px;
-  cursor: pointer;
-  transition: 0.2s;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
   font-weight: 600;
-  font-size: 14px;
-  user-select: none;
-
-  &.solicitado {
-    background: #f3e8ff;
-    color: #7c3aed;
-  }
-
-  &.andamento {
-    background: #e0f2fe;
-    color: #0284c7;
-  }
-
-  &.fechado {
-    background: #dcfce7;
-    color: #16a34a;
-  }
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: 0.2s ease;
+  position: relative;
 
   &:hover {
-    transform: scale(1.05);
+    filter: brightness(0.96);
+  }
+
+  .arrow {
+    width: 10px;
+    height: 10px;
+    display: block;
+    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
+    background-repeat: no-repeat;
+    background-size: 10px;
+  }
+}
+
+/* DROPDOWN FLUTUANTE */
+.status-dropdown {
+  position: absolute;
+  top: 42px;
+  left: 0;
+  background: #ffffff;
+  padding: 8px 0;
+  border-radius: 10px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+  width: 150px;
+  z-index: 20;
+  animation: fadeDown 0.18s ease-out;
+}
+
+/* SETINHA DO DROPDOWN */
+.dropdown-arrow {
+  position: absolute;
+  top: -6px;
+  left: 22px;
+  width: 12px;
+  height: 12px;
+  background: white;
+  transform: rotate(45deg);
+  box-shadow: -2px -2px 5px rgba(0, 0, 0, 0.06);
+}
+
+/* ITENS */
+.dropdown-item {
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #444;
+
+  &:hover {
+    background: #f3f4f6;
+  }
+}
+
+@keyframes fadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

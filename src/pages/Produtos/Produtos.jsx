@@ -44,9 +44,15 @@ const Produtos = ({ searchQuery }) => {
     return () => unsubscribe && unsubscribe();
   }, []);
 
-  const categories = useMemo(() => {
-    return ["Todas Categorias", ...dbCategories.map((c) => c.name)];
-  }, [dbCategories]);
+const categories = useMemo(() => {
+  return [
+    "Todas Categorias",
+    ...dbCategories
+      .filter((c) => c.active !== false) // só ativa
+      .map((c) => c.name)
+  ];
+}, [dbCategories]);
+
 
   /* =========================================================
       FUNÇÃO PARA PEGAR O MENOR PREÇO DO PRODUTO
